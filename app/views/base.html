@@ -1,0 +1,25 @@
+{{ define "header" }}
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="stylesheet" href="/css/app.min.css"/>
+    <script defer src="/js/htmx.min.js#1.9.5"></script>
+    <title>{{ Name }}</title>
+</head>
+<body>
+    <header>
+        <div class="grid grid-center">
+            <h1 style="color:white">GoLang Looking For Group</h1>
+        </div>
+    </header>
+    <main class="container">
+{{ end }}
+{{ define "footer" }}
+    </main>
+    <footer>
+        <p>{{ Name }} {{Version}}</p>
+    </footer>
+</body>
+</html>
+{{ end }}

@@ -1,0 +1,28 @@
+{{ template "header" . }}
+<form>
+    <fieldset>
+      <label>
+        Name
+        <input
+          name="name"
+          placeholder="Name"
+          autocomplete="given-name"
+        />
+      </label>
+      <label>
+        Email
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          autocomplete="email"
+        />
+      </label>
+    </fieldset>
+  
+    <input
+      type="submit"
+      value="Kickern!"
+    />
+  </form>
+{{ template "footer" . }}
