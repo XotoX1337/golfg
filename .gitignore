@@ -23,3 +23,17 @@ go.work.sum
 
 # env file
 .env
+
+# runtime config, logs and database (never commit real config / secrets)
+golfg.toml
+golfg.log
+golfg.db
+golfg.db-shm
+golfg.db-wal
+
+# build output
+dist/
+
+# IDE
+.idea/
+.vscode/

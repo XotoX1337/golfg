@@ -1,0 +1,23 @@
+# go LFG — example configuration.
+#
+# Copy this file to "golfg.toml" (next to the binary) and adjust, or inject any
+# value via environment variable using the scheme GOLFG_<SECTION>_<KEY>,
+# e.g. GOLFG_TEAMS_WEBHOOK_URL. ENV always overrides the file.
+#
+# The real golfg.toml and .env are gitignored — never commit secrets.
+
+[app]
+host = "0.0.0.0"                      # bind address (replaces the old hardcoded IP)
+port = 9000
+base_url = "http://localhost:9000"   # public URL, used for deep-links in Teams posts
+
+[auth]                               # leave empty = dev mode without SSO
+tenant_id = ""
+client_id = ""
+client_secret = ""                   # prefer ENV: GOLFG_AUTH_CLIENT_SECRET
+
+[teams]                              # leave empty = Teams posts are only logged
+webhook_url = ""                     # prefer ENV: GOLFG_TEAMS_WEBHOOK_URL
+
+[session]
+expire_minutes = 30                  # open sessions auto-expire after this many minutes
