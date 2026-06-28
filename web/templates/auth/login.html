@@ -1,24 +1,24 @@
 {{ template "header" . }}
 <article>
     <hgroup>
-        <h2>Developer Login</h2>
-        <p>SSO is not configured, so this is a local dev login. Type any name to continue — no password required.</p>
+        <h2>{{ call .T "login_title" }}</h2>
+        <p>{{ call .T "login_subtitle" }}</p>
     </hgroup>
 
-    {{ if .Error }}
-    <p style="color:var(--pico-del-color, #dc3545)">{{ .Error }}</p>
+    {{ if .ErrorKey }}
+    <p style="color:var(--pico-del-color, #dc3545)">{{ call .T .ErrorKey }}</p>
     {{ end }}
 
     <form method="post" action="/auth/dev-login">
         <label>
-            Name
-            <input name="name" placeholder="e.g. Anton" autocomplete="name" required autofocus/>
+            {{ call .T "login_name" }}
+            <input name="name" placeholder="{{ call .T "login_name_placeholder" }}" autocomplete="name" required autofocus/>
         </label>
         <label>
-            Email <small>(optional)</small>
+            {{ call .T "login_email" }} <small>{{ call .T "login_optional" }}</small>
             <input type="email" name="email" placeholder="anton@example.com" autocomplete="email"/>
         </label>
-        <button type="submit">Continue</button>
+        <button type="submit">{{ call .T "login_continue" }}</button>
     </form>
 </article>
 {{ template "footer" . }}

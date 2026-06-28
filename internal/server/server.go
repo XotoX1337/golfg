@@ -8,6 +8,7 @@ import (
 
 	"github.com/XotoX1337/golfg/internal/auth"
 	"github.com/XotoX1337/golfg/internal/config"
+	"github.com/XotoX1337/golfg/internal/i18n"
 	"github.com/XotoX1337/golfg/internal/session"
 	"github.com/XotoX1337/golfg/internal/store"
 	"github.com/XotoX1337/golfg/internal/teams"
@@ -26,6 +27,7 @@ type Server struct {
 	logger   *zap.Logger
 	auth     *auth.Manager
 	sessions *session.Manager
+	i18n     *i18n.Bundle
 }
 
 // New constructs the Fiber app, registers the template engine, routes and the
@@ -37,6 +39,11 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 		return nil, err
 	}
 	staticFS, err := fs.Sub(web.Static, "static")
+	if err != nil {
+		return nil, err
+	}
+
+	bundle, err := i18n.New()
 	if err != nil {
 		return nil, err
 	}
@@ -61,12 +68,16 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 	notifier := teams.New(cfg.Teams.WebhookURL, cfg.App.BaseURL, logger)
 	sessionMgr := session.New(st, logger, cfg.Session.ExpireMinutes, session.WithNotifier(notifier))
 
-	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr, sessions: sessionMgr}
+	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr, sessions: sessionMgr, i18n: bundle}
 	s.routes(staticFS)
 	return s, nil
 }
 
 func (s *Server) routes(staticFS fs.FS) {
+	// Resolve the request language before anything renders, so the login page
+	// (registered below) and every protected view get translations.
+	s.app.Use(s.withLocale)
+
 	// Resolve the current user for every request so handlers and templates
 	// (header, logout link) can see who is logged in.
 	s.app.Use(s.auth.LoadUser)

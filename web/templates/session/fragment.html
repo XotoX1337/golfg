@@ -4,13 +4,13 @@
   {{ if .IsDrawn }}
   <article>
     <hgroup>
-      <h2>Teams are set! ⚽</h2>
-      <p>{{ .Activity.Name }} — good luck.</p>
+      <h2>{{ call $.T "teams_set_title" }}</h2>
+      <p>{{ call $.T "teams_good_luck" "Activity" .Activity.Name }}</p>
     </hgroup>
     <div class="grid">
       {{ range .Teams }}
       <article>
-        <header><strong>Team {{ .Label }}</strong></header>
+        <header><strong>{{ call $.T "team_label" "Label" .Label }}</strong></header>
         <ul>
           {{ range .Members }}<li><i class="ri-user-fill"></i> {{ .DisplayName }}</li>{{ end }}
         </ul>
@@ -18,9 +18,9 @@
       {{ end }}
     </div>
     {{ if .Joined }}
-    <button class="secondary" hx-get="/session/finish" hx-target="#modal" hx-swap="innerHTML">End match</button>
+    <button class="secondary" hx-get="/session/finish" hx-target="#modal" hx-swap="innerHTML">{{ call $.T "match_end" }}</button>
     {{ else }}
-    <p><small>A match is in progress — wait for it to end before starting a new round.</small></p>
+    <p><small>{{ call $.T "match_in_progress" }}</small></p>
     {{ end }}
   </article>
   {{ else if .IsOpen }}
@@ -28,34 +28,34 @@
   <article>
     <hgroup>
       <h2>{{ .Activity.Name }}</h2>
-      <p>Open lobby — {{ .Count }} / {{ .Required }} players</p>
+      <p>{{ call $.T "lobby_open" "Count" .Count "Required" .Required }}</p>
     </hgroup>
     <progress value="{{ .Count }}" max="{{ .Required }}"></progress>
     <ul>
       {{ range .Participants }}
-      <li><i class="ri-user-fill"></i> {{ .DisplayName }}{{ if eq .UserID $creator }} <small>(host)</small>{{ end }}</li>
+      <li><i class="ri-user-fill"></i> {{ .DisplayName }}{{ if eq .UserID $creator }} <small>({{ call $.T "lobby_host" }})</small>{{ end }}</li>
       {{ end }}
     </ul>
     {{ if .Joined }}
     <form method="post" action="/session/leave" hx-post="/session/leave" hx-target="#session" hx-swap="outerHTML">
       <input type="hidden" name="session_id" value="{{ .Session.ID }}"/>
-      <button type="submit" class="secondary btn-danger">Leave</button>
+      <button type="submit" class="secondary btn-danger">{{ call $.T "session_leave" }}</button>
     </form>
     {{ else }}
     <form method="post" action="/session/join" hx-post="/session/join" hx-target="#session" hx-swap="outerHTML">
       <input type="hidden" name="session_id" value="{{ .Session.ID }}"/>
-      <button type="submit">Join</button>
+      <button type="submit">{{ call $.T "session_join" }}</button>
     </form>
     {{ end }}
   </article>
   {{ else }}
   <article class="grid-center">
     <hgroup>
-      <h2>Nobody's up for a game right now 😴</h2>
-      <p>Be the one to get a round going.</p>
+      <h2>{{ call $.T "empty_title" }}</h2>
+      <p>{{ call $.T "empty_subtitle" }}</p>
     </hgroup>
     <form method="post" action="/session/start" hx-post="/session/start" hx-target="#session" hx-swap="outerHTML">
-      <button type="submit">⚽ I want to play</button>
+      <button type="submit">{{ call $.T "session_start" }}</button>
     </form>
   </article>
   {{ end }}

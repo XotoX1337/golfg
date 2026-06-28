@@ -4,8 +4,8 @@
 <dialog open>
   <article>
     <header>
-      <button aria-label="Close" rel="prev" onclick="this.closest('dialog').remove()"></button>
-      <strong>Who won?</strong>
+      <button aria-label="{{ call $.T "aria_close" }}" rel="prev" onclick="this.closest('dialog').remove()"></button>
+      <strong>{{ call $.T "finish_who_won" }}</strong>
     </header>
     <form method="post" action="/session/finish" hx-post="/session/finish" hx-target="#session" hx-swap="outerHTML">
       <input type="hidden" name="session_id" value="{{ .Session.ID }}"/>
@@ -13,14 +13,14 @@
         {{ range .Teams }}
         <label class="team-option">
           <input type="radio" name="winner" value="{{ .Label }}" required/>
-          <strong>Team {{ .Label }}</strong>
+          <strong>{{ call $.T "team_label" "Label" .Label }}</strong>
           <small>{{ range $i, $m := .Members }}{{ if $i }}, {{ end }}{{ $m.DisplayName }}{{ end }}</small>
         </label>
         {{ end }}
       </fieldset>
       <footer class="grid">
-        <button type="button" class="btn-danger" onclick="this.closest('dialog').remove()">Cancel</button>
-        <button type="submit">End match</button>
+        <button type="button" class="btn-danger" onclick="this.closest('dialog').remove()">{{ call $.T "cancel" }}</button>
+        <button type="submit">{{ call $.T "match_end" }}</button>
       </footer>
     </form>
   </article>

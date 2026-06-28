@@ -24,7 +24,7 @@ func (m *Manager) handleDevLogin(c *fiber.Ctx) error {
 	name := strings.TrimSpace(c.FormValue("name"))
 	email := strings.TrimSpace(c.FormValue("email"))
 	if name == "" {
-		return m.renderDevLogin(c, "Please enter a name.")
+		return m.renderDevLogin(c, "login_err_name_required")
 	}
 
 	u, err := m.users.UpsertDev(name, email)
@@ -49,7 +49,8 @@ func (m *Manager) handleLogout(c *fiber.Ctx) error {
 	return c.Redirect("/", fiber.StatusFound)
 }
 
-// renderDevLogin renders the dev login form with an optional error message.
-func (m *Manager) renderDevLogin(c *fiber.Ctx, errMsg string) error {
-	return c.Render("auth/login", fiber.Map{"Error": errMsg})
+// renderDevLogin renders the dev login form with an optional error. errKey is
+// an i18n message ID (empty for none); the template translates it for display.
+func (m *Manager) renderDevLogin(c *fiber.Ctx, errKey string) error {
+	return c.Render("auth/login", fiber.Map{"ErrorKey": errKey})
 }

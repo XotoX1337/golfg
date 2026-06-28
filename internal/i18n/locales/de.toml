@@ -1,0 +1,33 @@
+nav_logout = "Abmelden"
+
+lobby_title = "Lobby"
+lobby_welcome = "Willkommen, {{.Name}} 👋"
+lobby_open = "Offene Lobby — {{.Count}} / {{.Required}} Spieler"
+lobby_host = "Host"
+
+empty_title = "Gerade hat niemand Lust auf eine Runde 😴"
+empty_subtitle = "Sei derjenige, der eine Runde ins Rollen bringt."
+
+session_start = "⚽ Ich will spielen"
+session_join = "Mitspielen"
+session_leave = "Verlassen"
+
+teams_set_title = "Die Teams stehen! ⚽"
+teams_good_luck = "{{.Activity}} — viel Erfolg."
+team_label = "Team {{.Label}}"
+
+match_in_progress = "Ein Match läuft gerade — warte, bis es vorbei ist, bevor du eine neue Runde startest."
+match_end = "Match beenden"
+
+finish_who_won = "Wer hat gewonnen?"
+cancel = "Abbrechen"
+aria_close = "Schließen"
+
+login_title = "Entwickler-Login"
+login_subtitle = "SSO ist nicht konfiguriert, dies ist ein lokaler Dev-Login. Gib einen beliebigen Namen ein, um fortzufahren — kein Passwort nötig."
+login_name = "Name"
+login_name_placeholder = "z. B. Anton"
+login_email = "E-Mail"
+login_optional = "(optional)"
+login_continue = "Weiter"
+login_err_name_required = "Bitte gib einen Namen ein."
