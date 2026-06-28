@@ -34,6 +34,10 @@ golfg.db-wal
 # build output
 dist/
 
+# internal planning docs (kept local; only docs/setup-* is tracked)
+docs/PLAN.md
+docs/workpackages/
+
 # local test artifacts (curl cookie jars, scratch files)
 *.cookies
 cj.txt
