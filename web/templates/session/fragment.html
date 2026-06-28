@@ -1,67 +1,93 @@
 {{ define "session-fragment" }}
-<div id="session" hx-get="/session" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML">
+<div id="session" hx-get="/session" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML transition:true">
 {{ with .Lobby }}
   {{ if .IsDrawn }}
-  <article>
+  {{/* ---- Teams are drawn -------------------------------------------------- */}}
+  <article class="lobby-card">
     <hgroup>
       <h2>{{ call $.T "teams_set_title" }}</h2>
       <p>{{ call $.T "teams_good_luck" "Activity" .Activity.Name }}</p>
     </hgroup>
-    <div class="grid">
-      {{ range .Teams }}
-      <article>
-        <header><strong>{{ call $.T "team_label" "Label" .Label }}</strong></header>
+    <div class="teams">
+      {{ range $i, $team := .Teams }}
+      {{ if $i }}<div class="vs" aria-hidden="true">{{ call $.T "versus" }}</div>{{ end }}
+      <article class="team-card">
+        <header>{{ call $.T "team_label" "Label" $team.Label }}</header>
         <ul>
-          {{ range .Members }}<li><i class="ri-user-fill"></i> {{ .DisplayName }}</li>{{ end }}
+          {{ range $team.Members }}
+          <li>
+            <span class="avatar" aria-hidden="true">{{ Initials .DisplayName }}</span>
+            <span class="name">{{ .DisplayName }}</span>
+          </li>
+          {{ end }}
         </ul>
       </article>
       {{ end }}
     </div>
     {{ if .IsCreator }}
-    <form method="post" action="/session/reroll" hx-post="/session/reroll" hx-target="#session" hx-swap="outerHTML">
+    <form method="post" action="/session/reroll" hx-post="/session/reroll" hx-target="#session" hx-swap="outerHTML transition:true">
       <input type="hidden" name="session_id" value="{{ .Session.ID }}"/>
       <button type="submit" class="secondary outline">{{ call $.T "lobby_reroll" }}</button>
     </form>
     {{ end }}
     {{ if .Joined }}
-    <button class="secondary" hx-get="/session/finish" hx-target="#modal" hx-swap="innerHTML">{{ call $.T "match_end" }}</button>
+    <button class="contrast" hx-get="/session/finish" hx-target="#modal" hx-swap="innerHTML">{{ call $.T "match_end" }}</button>
     {{ else }}
     <p><small>{{ call $.T "match_in_progress" }}</small></p>
     {{ end }}
   </article>
+
   {{ else if .IsOpen }}
+  {{/* ---- Open session, waiting for players -------------------------------- */}}
   {{ $creator := .Session.CreatorID }}
-  <article>
+  <article class="lobby-card">
     <hgroup>
       <h2>{{ .Activity.Name }}</h2>
-      <p>{{ call $.T "lobby_open" "Count" .Count "Required" .Required }}</p>
+      <p>{{ call $.T "lobby_open_hint" }}</p>
     </hgroup>
+    <div class="lobby-progress">
+      <span class="count">{{ .Count }}<span class="sep"> / </span>{{ .Required }}</span>
+      <span class="hint">{{ call $.T "lobby_players" }}</span>
+    </div>
     <progress value="{{ .Count }}" max="{{ .Required }}"></progress>
-    <ul>
+    <ul class="participants">
       {{ range .Participants }}
-      <li><i class="ri-user-fill"></i> {{ .DisplayName }}{{ if eq .UserID $creator }} <small>({{ call $.T "lobby_host" }})</small>{{ end }}</li>
+      <li>
+        <span class="avatar" aria-hidden="true">{{ Initials .DisplayName }}</span>
+        <span class="name">{{ .DisplayName }}</span>
+        {{ if eq .UserID $creator }}<span class="host-badge">{{ call $.T "lobby_host" }}</span>{{ end }}
+      </li>
+      {{ end }}
+      {{ range OpenSlots .Required .Count }}
+      <li class="slot-open">
+        <span class="avatar" aria-hidden="true"><i class="ri-user-add-line"></i></span>
+        <span class="name">{{ call $.T "lobby_slot_open" }}</span>
+      </li>
       {{ end }}
     </ul>
     {{ if .Joined }}
-    <form method="post" action="/session/leave" hx-post="/session/leave" hx-target="#session" hx-swap="outerHTML">
+    <form method="post" action="/session/leave" hx-post="/session/leave" hx-target="#session" hx-swap="outerHTML transition:true">
       <input type="hidden" name="session_id" value="{{ .Session.ID }}"/>
-      <button type="submit" class="secondary btn-danger">{{ call $.T "session_leave" }}</button>
+      <button type="submit" class="btn-danger">{{ call $.T "session_leave" }}</button>
     </form>
     {{ else }}
-    <form method="post" action="/session/join" hx-post="/session/join" hx-target="#session" hx-swap="outerHTML">
+    <form method="post" action="/session/join" hx-post="/session/join" hx-target="#session" hx-swap="outerHTML transition:true">
       <input type="hidden" name="session_id" value="{{ .Session.ID }}"/>
-      <button type="submit">{{ call $.T "session_join" }}</button>
+      <button type="submit" class="cta">{{ call $.T "session_join" }}</button>
     </form>
     {{ end }}
   </article>
+
   {{ else }}
-  <article class="grid-center">
+  {{/* ---- Nothing going on ------------------------------------------------- */}}
+  <article class="lobby-card empty-state">
+    <div class="empty-emoji" aria-hidden="true">😴</div>
     <hgroup>
       <h2>{{ call $.T "empty_title" }}</h2>
       <p>{{ call $.T "empty_subtitle" }}</p>
     </hgroup>
-    <form method="post" action="/session/start" hx-post="/session/start" hx-target="#session" hx-swap="outerHTML">
-      <button type="submit">{{ call $.T "session_start" }}</button>
+    <form method="post" action="/session/start" hx-post="/session/start" hx-target="#session" hx-swap="outerHTML transition:true">
+      <button type="submit" class="cta">{{ call $.T "session_start" }}</button>
     </form>
   </article>
   {{ end }}

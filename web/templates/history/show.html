@@ -38,12 +38,18 @@
     <strong>{{ .Activity.Name }}</strong>
     <small> · {{ DateTime .Session.CreatedAt }}</small>
   </header>
-  <div class="grid">
-    {{ range .Teams }}
-    <article{{ if eq .Label $winner }} class="team-winner"{{ end }}>
-      <header><strong>{{ call $.T "team_label" "Label" .Label }}</strong>{{ if eq .Label $winner }} 🏆{{ end }}</header>
+  <div class="teams">
+    {{ range $i, $team := .Teams }}
+    {{ if $i }}<div class="vs" aria-hidden="true">{{ call $.T "versus" }}</div>{{ end }}
+    <article class="team-card{{ if eq $team.Label $winner }} team-winner{{ end }}">
+      <header>{{ call $.T "team_label" "Label" $team.Label }}{{ if eq $team.Label $winner }} 🏆{{ end }}</header>
       <ul>
-        {{ range .Members }}<li><i class="ri-user-fill"></i> {{ .DisplayName }}</li>{{ end }}
+        {{ range $team.Members }}
+        <li>
+          <span class="avatar" aria-hidden="true">{{ Initials .DisplayName }}</span>
+          <span class="name">{{ .DisplayName }}</span>
+        </li>
+        {{ end }}
       </ul>
     </article>
     {{ end }}
@@ -52,7 +58,8 @@
 </article>
 {{ end }}
 {{ else }}
-<article class="grid-center">
+<article class="empty-state">
+  <div class="empty-emoji" aria-hidden="true">📭</div>
   <p>{{ call $.T "history_empty" }}</p>
 </article>
 {{ end }}

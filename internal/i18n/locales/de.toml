@@ -1,10 +1,14 @@
 nav_logout = "Abmelden"
 nav_history = "Verlauf"
+theme_toggle = "Hell / Dunkel umschalten"
 
 lobby_title = "Lobby"
 lobby_welcome = "Willkommen, {{.Name}} 👋"
-lobby_open = "Offene Lobby — {{.Count}} / {{.Required}} Spieler"
+lobby_open_hint = "Warte auf weitere Spieler…"
+lobby_players = "Spieler"
+lobby_slot_open = "Freier Platz"
 lobby_host = "Host"
+versus = "VS"
 
 empty_title = "Gerade hat niemand Lust auf eine Runde 😴"
 empty_subtitle = "Sei derjenige, der eine Runde ins Rollen bringt."
@@ -37,6 +41,7 @@ aria_close = "Schließen"
 
 login_title = "Entwickler-Login"
 login_subtitle = "SSO ist nicht konfiguriert, dies ist ein lokaler Dev-Login. Gib einen beliebigen Namen ein, um fortzufahren — kein Passwort nötig."
+login_dev_note = "Dev-Modus — jeder kann sich nur mit einem Namen anmelden."
 login_name = "Name"
 login_name_placeholder = "z. B. Anton"
 login_email = "E-Mail"

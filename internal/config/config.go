@@ -26,12 +26,17 @@ const (
 // ConfigFileName is the base name (without extension) of the runtime config file.
 const ConfigFileName = ServiceName // golfg(.toml)
 
+// DefaultAccentColor is the accent used when none is configured. A deep teal:
+// distinctive, theme-neutral and high-contrast against white button text.
+const DefaultAccentColor = "#0f766e"
+
 // Config is the fully-resolved application configuration.
 type Config struct {
-	App     AppConfig     `mapstructure:"app"`
-	Auth    AuthConfig    `mapstructure:"auth"`
-	Teams   TeamsConfig   `mapstructure:"teams"`
-	Session SessionConfig `mapstructure:"session"`
+	App      AppConfig      `mapstructure:"app"`
+	Auth     AuthConfig     `mapstructure:"auth"`
+	Teams    TeamsConfig    `mapstructure:"teams"`
+	Session  SessionConfig  `mapstructure:"session"`
+	Branding BrandingConfig `mapstructure:"branding"`
 
 	// Resolved runtime paths (not read from the file).
 	DataDir    string `mapstructure:"-"`
@@ -58,6 +63,16 @@ type TeamsConfig struct {
 	WebhookURL string `mapstructure:"webhook_url"`
 }
 
+// BrandingConfig holds white-label UI settings so the public repo carries no
+// firm-specific name or color. Both are safe to expose (no secrets).
+type BrandingConfig struct {
+	// AppName is shown in the header, page title and footer. Empty = DisplayName.
+	AppName string `mapstructure:"app_name"`
+	// AccentColor is any CSS color (hex recommended). It drives every accent
+	// surface; hover/focus shades are derived from it in CSS. Empty = default.
+	AccentColor string `mapstructure:"accent_color"`
+}
+
 type SessionConfig struct {
 	ExpireMinutes int `mapstructure:"expire_minutes"`
 	// CookieSecure marks the auth session cookie as Secure (HTTPS-only). Keep
@@ -77,6 +92,22 @@ func (c *Config) TeamsEnabled() bool {
 	return c.Teams.WebhookURL != ""
 }
 
+// AppName returns the configured branding name, falling back to DisplayName.
+func (c *Config) AppName() string {
+	if c.Branding.AppName != "" {
+		return c.Branding.AppName
+	}
+	return DisplayName
+}
+
+// AccentColor returns the configured accent color, falling back to the default.
+func (c *Config) AccentColor() string {
+	if c.Branding.AccentColor != "" {
+		return c.Branding.AccentColor
+	}
+	return DefaultAccentColor
+}
+
 // Addr returns the host:port the server should bind to.
 func (c *Config) Addr() string {
 	return fmt.Sprintf("%s:%d", c.App.Host, c.App.Port)
@@ -92,6 +123,8 @@ var envBindings = []struct {
 	{"app.host", "GOLFG_APP_HOST", "0.0.0.0"},
 	{"app.port", "GOLFG_APP_PORT", 9000},
 	{"app.base_url", "GOLFG_APP_BASE_URL", "http://localhost:9000"},
+	{"branding.app_name", "GOLFG_BRANDING_APP_NAME", DisplayName},
+	{"branding.accent_color", "GOLFG_BRANDING_ACCENT_COLOR", DefaultAccentColor},
 	{"auth.tenant_id", "GOLFG_AUTH_TENANT_ID", ""},
 	{"auth.client_id", "GOLFG_AUTH_CLIENT_ID", ""},
 	{"auth.client_secret", "GOLFG_AUTH_CLIENT_SECRET", ""},

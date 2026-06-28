@@ -1,10 +1,14 @@
 nav_logout = "Logout"
 nav_history = "History"
+theme_toggle = "Toggle light / dark theme"
 
 lobby_title = "Lobby"
 lobby_welcome = "Welcome, {{.Name}} 👋"
-lobby_open = "Open lobby — {{.Count}} / {{.Required}} players"
+lobby_open_hint = "Waiting for players to join…"
+lobby_players = "players"
+lobby_slot_open = "Open slot"
 lobby_host = "host"
+versus = "VS"
 
 empty_title = "Nobody's up for a game right now 😴"
 empty_subtitle = "Be the one to get a round going."
@@ -37,6 +41,7 @@ aria_close = "Close"
 
 login_title = "Developer Login"
 login_subtitle = "SSO is not configured, so this is a local dev login. Type any name to continue — no password required."
+login_dev_note = "Dev mode — anyone can sign in with just a name."
 login_name = "Name"
 login_name_placeholder = "e.g. Anton"
 login_email = "Email"

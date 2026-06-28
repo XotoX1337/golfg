@@ -4,7 +4,9 @@ package server
 import (
 	"io/fs"
 	"net/http"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/XotoX1337/golfg/internal/auth"
 	"github.com/XotoX1337/golfg/internal/config"
@@ -55,7 +57,10 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 	}
 
 	engine := html.NewFileSystem(http.FS(tmplFS), ".html")
-	engine.AddFunc("Name", func() string { return config.DisplayName })
+	engine.AddFunc("Name", cfg.AppName)
+	engine.AddFunc("Accent", cfg.AccentColor)
+	engine.AddFunc("Initials", initials)
+	engine.AddFunc("OpenSlots", openSlots)
 	engine.AddFunc("Version", func() string { return config.Version })
 	engine.AddFunc("Year", func() int { return time.Now().Year() })
 	engine.AddFunc("DateTime", func(t time.Time) string {
@@ -66,7 +71,7 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 	})
 
 	app := fiber.New(fiber.Config{
-		AppName: config.DisplayName,
+		AppName: cfg.AppName(),
 		Views:   engine,
 	})
 
@@ -114,6 +119,41 @@ func (s *Server) startReaper() {
 			}
 		}
 	}()
+}
+
+// initials returns up to two uppercase letters for an avatar badge: the first
+// letter of the first and last name parts (e.g. "Anton Berg" -> "AB", "Anton"
+// -> "A"). Falls back to "?" for an empty/symbol-only name.
+func initials(name string) string {
+	fields := strings.Fields(name)
+	var letters []rune
+	for _, f := range fields {
+		for _, r := range f {
+			if unicode.IsLetter(r) || unicode.IsDigit(r) {
+				letters = append(letters, unicode.ToUpper(r))
+				break
+			}
+		}
+	}
+	switch len(letters) {
+	case 0:
+		return "?"
+	case 1:
+		return string(letters[0])
+	default:
+		return string([]rune{letters[0], letters[len(letters)-1]})
+	}
+}
+
+// openSlots returns a slice sized to the number of still-open player slots, so
+// templates can render placeholder rows (range over it) and keep the lobby
+// layout stable as players join.
+func openSlots(required, count int) []struct{} {
+	n := required - count
+	if n < 0 {
+		n = 0
+	}
+	return make([]struct{}, n)
 }
 
 func (s *Server) routes(staticFS fs.FS) {

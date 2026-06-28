@@ -1,12 +1,16 @@
 {{ template "header" . }}
-<article>
+<article class="narrow auth-card">
     <hgroup>
         <h2>{{ call .T "login_title" }}</h2>
         <p>{{ call .T "login_subtitle" }}</p>
     </hgroup>
 
+    {{ if .DevMode }}
+    <p class="dev-note"><i class="ri-information-line"></i> {{ call .T "login_dev_note" }}</p>
+    {{ end }}
+
     {{ if .ErrorKey }}
-    <p style="color:var(--pico-del-color, #dc3545)">{{ call .T .ErrorKey }}</p>
+    <p class="form-error" role="alert">{{ call .T .ErrorKey }}</p>
     {{ end }}
 
     <form method="post" action="/auth/dev-login">

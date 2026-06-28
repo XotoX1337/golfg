@@ -2,35 +2,68 @@
 <!DOCTYPE html>
 <html lang="{{ .Lang }}" data-theme="light">
 <head>
+    <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="color-scheme" content="light dark"/>
+    <meta name="theme-color" content="{{ Accent }}"/>
+    <meta name="description" content="{{ Name }} — find colleagues for a quick game."/>
+    <link rel="icon" href="/favicon.ico"/>
+    {{/* Set the theme before first paint to avoid a light/dark flash. */}}
+    <script>
+    (function () {
+        try {
+            var t = localStorage.getItem('golfg_theme') ||
+                (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', t);
+        } catch (e) { /* keep the markup default */ }
+    })();
+    function toggleTheme() {
+        var el = document.documentElement;
+        var next = el.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        el.setAttribute('data-theme', next);
+        try { localStorage.setItem('golfg_theme', next); } catch (e) {}
+    }
+    </script>
+    {{/* Branding accent comes from config; the CSS derives every shade from it. */}}
+    <style>:root{--brand-accent:{{ Accent }};}</style>
     <link rel="stylesheet" href="/css/app.min.css"/>
     <script defer src="/js/htmx.min.js#1.9.5"></script>
     <title>{{ Name }}</title>
 </head>
 <body>
-    <header>
+    <header class="app-header">
         <nav class="container">
             <ul>
-                <li><strong style="color:white">{{ Name }}</strong></li>
+                <li class="brand"><i class="ri-football-line"></i> <strong>{{ Name }}</strong></li>
                 {{ if .DevMode }}
-                <li><small style="color:#fff;background:#dc3545;padding:2px 8px;border-radius:4px">DEV MODE</small></li>
+                <li><span class="dev-badge">DEV</span></li>
                 {{ end }}
             </ul>
-            {{ if .CurrentUser }}
             <ul>
-                <li style="color:white">{{ .CurrentUser.DisplayName }}</li>
-                <li><a href="/history" role="button" class="secondary outline">{{ call .T "nav_history" }}</a></li>
-                <li><a href="/auth/logout" role="button" class="secondary">{{ call .T "nav_logout" }}</a></li>
+                <li>
+                    <button class="theme-toggle" type="button" onclick="toggleTheme()"
+                            aria-label="{{ call .T "theme_toggle" }}" title="{{ call .T "theme_toggle" }}">
+                        <i class="ri-moon-line theme-icon-moon"></i>
+                        <i class="ri-sun-line theme-icon-sun"></i>
+                    </button>
+                </li>
+                {{ if .CurrentUser }}
+                <li class="current-user">
+                    <span class="avatar avatar-sm" aria-hidden="true">{{ Initials .CurrentUser.DisplayName }}</span>
+                    <span class="current-user-name">{{ .CurrentUser.DisplayName }}</span>
+                </li>
+                <li><a href="/history" role="button" class="secondary outline" title="{{ call .T "nav_history" }}"><i class="ri-history-line"></i> <span class="label-md">{{ call .T "nav_history" }}</span></a></li>
+                <li><a href="/auth/logout" role="button" class="secondary outline" title="{{ call .T "nav_logout" }}"><i class="ri-logout-box-r-line"></i> <span class="label-md">{{ call .T "nav_logout" }}</span></a></li>
+                {{ end }}
             </ul>
-            {{ end }}
         </nav>
     </header>
     <main class="container">
 {{ end }}
 {{ define "footer" }}
     </main>
-    <footer>
-        <p>{{ Name }} {{ Version }}</p>
+    <footer class="container">
+        <small>{{ Name }} · {{ Version }} · © {{ Year }}</small>
     </footer>
 </body>
 </html>

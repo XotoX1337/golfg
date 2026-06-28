@@ -22,3 +22,7 @@ webhook_url = ""                     # prefer ENV: GOLFG_TEAMS_WEBHOOK_URL
 [session]
 expire_minutes = 30                  # open sessions auto-expire after this many minutes
 cookie_secure = false                # set true in production behind HTTPS (Secure-only auth cookie)
+
+[branding]                           # white-label the UI (no secrets — safe to commit)
+app_name = "go LFG"                  # shown in header, page title and footer
+accent_color = "#0f766e"             # any CSS color; drives buttons, header and highlights
