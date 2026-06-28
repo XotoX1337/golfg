@@ -56,6 +56,17 @@ func (s *Server) leaveSession(c *fiber.Ctx) error {
 	return s.renderFragment(c)
 }
 
+// reRollSession re-draws the teams of the current DRAWN session (host only),
+// then re-renders the fragment. A non-host or stale request is a soft error.
+func (s *Server) reRollSession(c *fiber.Ctx) error {
+	u := s.auth.CurrentUser(c)
+	if err := s.sessions.ReRoll(c.FormValue("session_id"), u.ID); err != nil && !isSoftSessionErr(err) {
+		s.logger.Error("reroll session", zap.Error(err))
+		return err
+	}
+	return s.renderFragment(c)
+}
+
 // showFinishModal renders the "who won?" dialog for a DRAWN session. The template
 // only emits a dialog when the current user is a participant of a drawn session;
 // otherwise it renders empty (clearing the modal container).
@@ -113,7 +124,8 @@ func isSoftSessionErr(err error) bool {
 		errors.Is(err, session.ErrSessionFull),
 		errors.Is(err, session.ErrSessionNotDrawn),
 		errors.Is(err, session.ErrNotParticipant),
-		errors.Is(err, session.ErrInvalidWinner):
+		errors.Is(err, session.ErrInvalidWinner),
+		errors.Is(err, session.ErrNotCreator):
 		return true
 	default:
 		return false

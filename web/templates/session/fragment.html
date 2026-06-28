@@ -17,6 +17,12 @@
       </article>
       {{ end }}
     </div>
+    {{ if .IsCreator }}
+    <form method="post" action="/session/reroll" hx-post="/session/reroll" hx-target="#session" hx-swap="outerHTML">
+      <input type="hidden" name="session_id" value="{{ .Session.ID }}"/>
+      <button type="submit" class="secondary outline">{{ call $.T "lobby_reroll" }}</button>
+    </form>
+    {{ end }}
     {{ if .Joined }}
     <button class="secondary" hx-get="/session/finish" hx-target="#modal" hx-swap="innerHTML">{{ call $.T "match_end" }}</button>
     {{ else }}

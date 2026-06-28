@@ -1,4 +1,5 @@
 nav_logout = "Abmelden"
+nav_history = "Verlauf"
 
 lobby_title = "Lobby"
 lobby_welcome = "Willkommen, {{.Name}} 👋"
@@ -18,6 +19,17 @@ team_label = "Team {{.Label}}"
 
 match_in_progress = "Ein Match läuft gerade — warte, bis es vorbei ist, bevor du eine neue Runde startest."
 match_end = "Match beenden"
+lobby_reroll = "🎲 Teams neu würfeln"
+
+history_title = "Verlauf"
+history_subtitle = "{{.Total}} Partien bisher gespielt."
+history_empty = "Noch keine beendeten Partien."
+history_winner = "🏆 Team {{.Team}} hat gewonnen"
+back_to_lobby = "← Zurück zur Lobby"
+stats_title = "Bestenliste"
+stats_player = "Spieler"
+stats_played = "Gespielt"
+stats_wins = "Siege"
 
 finish_who_won = "Wer hat gewonnen?"
 cancel = "Abbrechen"

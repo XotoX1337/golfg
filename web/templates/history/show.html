@@ -1,0 +1,60 @@
+{{ template "header" . }}
+<hgroup>
+    <h1>{{ call .T "history_title" }}</h1>
+    <p>{{ call .T "history_subtitle" "Total" .History.Total }}</p>
+</hgroup>
+<p><a href="/" class="secondary" role="button">{{ call .T "back_to_lobby" }}</a></p>
+
+{{ with .History }}
+{{ if .Stats }}
+<article>
+  <header><strong>{{ call $.T "stats_title" }}</strong></header>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">{{ call $.T "stats_player" }}</th>
+        <th scope="col">{{ call $.T "stats_played" }}</th>
+        <th scope="col">{{ call $.T "stats_wins" }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .Stats }}
+      <tr>
+        <td><i class="ri-user-fill"></i> {{ .DisplayName }}</td>
+        <td>{{ .Played }}</td>
+        <td>{{ .Wins }}</td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</article>
+{{ end }}
+
+{{ if .Entries }}
+{{ range .Entries }}
+{{ $winner := .WinnerTeam }}
+<article>
+  <header>
+    <strong>{{ .Activity.Name }}</strong>
+    <small> · {{ DateTime .Session.CreatedAt }}</small>
+  </header>
+  <div class="grid">
+    {{ range .Teams }}
+    <article{{ if eq .Label $winner }} class="team-winner"{{ end }}>
+      <header><strong>{{ call $.T "team_label" "Label" .Label }}</strong>{{ if eq .Label $winner }} 🏆{{ end }}</header>
+      <ul>
+        {{ range .Members }}<li><i class="ri-user-fill"></i> {{ .DisplayName }}</li>{{ end }}
+      </ul>
+    </article>
+    {{ end }}
+  </div>
+  <footer><small>{{ call $.T "history_winner" "Team" $winner }}</small></footer>
+</article>
+{{ end }}
+{{ else }}
+<article class="grid-center">
+  <p>{{ call $.T "history_empty" }}</p>
+</article>
+{{ end }}
+{{ end }}
+{{ template "footer" . }}

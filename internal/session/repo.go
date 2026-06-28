@@ -3,6 +3,7 @@ package session
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/XotoX1337/golfg/internal/store"
 )
@@ -44,6 +45,96 @@ func (r *Repository) Active() (*Session, error) {
 // Get returns the session with the given id, or nil if none exists.
 func (r *Repository) Get(id string) (*Session, error) {
 	return r.scanOne(sessionColumns+` WHERE id = ?`, id)
+}
+
+// FinishedSessions returns the most recently finished (DONE) sessions, newest
+// first, capped at limit. These are the matches the history page lists.
+func (r *Repository) FinishedSessions(limit int) ([]*Session, error) {
+	rows, err := r.db.Query(sessionColumns+` WHERE status = 'DONE' ORDER BY rowid DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list finished sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*Session
+	for rows.Next() {
+		s, err := scanSession(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// CountFinished returns the total number of finished (DONE) matches ever played.
+func (r *Repository) CountFinished() (int, error) {
+	var n int
+	err := r.db.QueryRow(`SELECT COUNT(1) FROM sessions WHERE status = 'DONE'`).Scan(&n)
+	return n, err
+}
+
+// Leaderboard tallies each player's finished matches and wins (their team equals
+// the session's winning team), ordered by wins then matches played. One small
+// grouped query — the history page is read-rarely and the data set is tiny.
+func (r *Repository) Leaderboard() ([]Stat, error) {
+	rows, err := r.db.Query(`
+		SELECT u.display_name,
+		       COUNT(*) AS played,
+		       COALESCE(SUM(CASE WHEN p.team = s.winner_team THEN 1 ELSE 0 END), 0) AS wins
+		FROM participations p
+		JOIN sessions s ON s.id = p.session_id
+		JOIN users u ON u.id = p.user_id
+		WHERE s.status = 'DONE'
+		GROUP BY p.user_id
+		ORDER BY wins DESC, played DESC, u.display_name`)
+	if err != nil {
+		return nil, fmt.Errorf("leaderboard: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Stat
+	for rows.Next() {
+		var st Stat
+		if err := rows.Scan(&st.DisplayName, &st.Played, &st.Wins); err != nil {
+			return nil, err
+		}
+		out = append(out, st)
+	}
+	return out, rows.Err()
+}
+
+// ExpireStale flips OPEN sessions whose expiry has passed to EXPIRED and returns
+// the affected session ids. DRAWN sessions (a match in progress) are never
+// expired — only rounds still gathering players time out.
+func (r *Repository) ExpireStale(now time.Time) ([]string, error) {
+	rows, err := r.db.Query(
+		`SELECT id FROM sessions WHERE status = 'OPEN' AND expires_at IS NOT NULL AND expires_at <= ?`,
+		now.UTC(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("find stale sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for _, id := range ids {
+		if _, err := r.db.Exec(`UPDATE sessions SET status = ? WHERE id = ?`, string(StatusExpired), id); err != nil {
+			return nil, fmt.Errorf("expire session %s: %w", id, err)
+		}
+	}
+	return ids, nil
 }
 
 // SetStatus updates a session's lifecycle state.
@@ -168,17 +259,30 @@ func (r *Repository) Finish(sessionID, winnerTeam string) error {
 
 // scanOne runs a single-row session query, returning nil (no error) for no row.
 func (r *Repository) scanOne(query string, args ...any) (*Session, error) {
-	var s Session
-	var status string
-	var expires sql.NullTime
-	var winner sql.NullString
-	err := r.db.QueryRow(query, args...).Scan(
-		&s.ID, &s.ActivityID, &s.CreatorID, &status, &s.CreatedAt, &expires, &winner,
-	)
+	s, err := scanSession(r.db.QueryRow(query, args...))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// rowScanner is satisfied by both *sql.Row and *sql.Rows, so a single session
+// row can be decoded from either a single-row query or a result set.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanSession decodes one session row (in sessionColumns order), normalizing the
+// nullable expires_at and winner_team columns.
+func scanSession(sc rowScanner) (*Session, error) {
+	var s Session
+	var status string
+	var expires sql.NullTime
+	var winner sql.NullString
+	if err := sc.Scan(&s.ID, &s.ActivityID, &s.CreatorID, &status, &s.CreatedAt, &expires, &winner); err != nil {
 		return nil, err
 	}
 	s.Status = Status(status)

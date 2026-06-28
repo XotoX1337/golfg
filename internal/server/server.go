@@ -28,7 +28,13 @@ type Server struct {
 	auth     *auth.Manager
 	sessions *session.Manager
 	i18n     *i18n.Bundle
+
+	reaperStop chan struct{} // closed on Shutdown to stop the expiry reaper
 }
+
+// reapInterval is how often the expiry reaper sweeps for stale OPEN sessions.
+// A minute is plenty given expiry is configured in whole minutes.
+const reapInterval = time.Minute
 
 // New constructs the Fiber app, registers the template engine, routes and the
 // embedded static file handler.
@@ -52,6 +58,12 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 	engine.AddFunc("Name", func() string { return config.DisplayName })
 	engine.AddFunc("Version", func() string { return config.Version })
 	engine.AddFunc("Year", func() int { return time.Now().Year() })
+	engine.AddFunc("DateTime", func(t time.Time) string {
+		if t.IsZero() {
+			return ""
+		}
+		return t.Local().Format("2006-01-02 15:04")
+	})
 
 	app := fiber.New(fiber.Config{
 		AppName: config.DisplayName,
@@ -70,7 +82,38 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 
 	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr, sessions: sessionMgr, i18n: bundle}
 	s.routes(staticFS)
+	if cfg.Session.ExpireMinutes > 0 {
+		s.startReaper()
+	}
 	return s, nil
+}
+
+// startReaper launches a background goroutine that periodically expires stale
+// OPEN sessions. It sweeps once immediately (to clear rounds left over from a
+// previous run) and then on every tick until Shutdown closes reaperStop.
+func (s *Server) startReaper() {
+	s.reaperStop = make(chan struct{})
+	go func() {
+		sweep := func() {
+			if n, err := s.sessions.ExpireStale(); err != nil {
+				s.logger.Error("expire stale sessions", zap.Error(err))
+			} else if n > 0 {
+				s.logger.Info("expired stale sessions", zap.Int("count", n))
+			}
+		}
+		sweep()
+
+		t := time.NewTicker(reapInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-s.reaperStop:
+				return
+			case <-t.C:
+				sweep()
+			}
+		}
+	}()
 }
 
 func (s *Server) routes(staticFS fs.FS) {
@@ -90,8 +133,10 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.app.Post("/session/start", s.auth.RequireAuth, s.startSession)
 	s.app.Post("/session/join", s.auth.RequireAuth, s.joinSession)
 	s.app.Post("/session/leave", s.auth.RequireAuth, s.leaveSession)
+	s.app.Post("/session/reroll", s.auth.RequireAuth, s.reRollSession)
 	s.app.Get("/session/finish", s.auth.RequireAuth, s.showFinishModal)
 	s.app.Post("/session/finish", s.auth.RequireAuth, s.finishSession)
+	s.app.Get("/history", s.auth.RequireAuth, s.showHistory)
 
 	// Serve embedded static assets as a catch-all (must be registered last).
 	s.app.Use("/", filesystem.New(filesystem.Config{
@@ -105,7 +150,11 @@ func (s *Server) Listen() error {
 	return s.app.Listen(s.cfg.Addr())
 }
 
-// Shutdown gracefully stops the server.
+// Shutdown gracefully stops the server, first signalling the expiry reaper to
+// stop.
 func (s *Server) Shutdown() error {
+	if s.reaperStop != nil {
+		close(s.reaperStop)
+	}
 	return s.app.Shutdown()
 }

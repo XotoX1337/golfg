@@ -9,7 +9,8 @@
 //
 // with CANCELLED/EXPIRED as terminal off-ramps. When the participant count
 // reaches the activity's RequiredPlayers, the teams are drawn and the session
-// moves to DRAWN (closed for joining). Auto-expire and re-roll arrive in WP4.
+// moves to DRAWN (closed for joining). Stale OPEN rounds time out to EXPIRED via
+// ExpireStale; the host can ReRoll the teams of a DRAWN round.
 package session
 
 import (
@@ -41,6 +42,7 @@ var (
 	ErrSessionNotDrawn = errors.New("session is not drawn")
 	ErrNotParticipant  = errors.New("not a participant of this session")
 	ErrInvalidWinner   = errors.New("invalid winning team")
+	ErrNotCreator      = errors.New("only the host may do this")
 )
 
 // Session is a single kicker round.
@@ -83,6 +85,30 @@ type Lobby struct {
 	Teams        []Team // populated when IsDrawn
 	Joined       bool   // current user is a participant
 	IsCreator    bool   // current user started the session
+}
+
+// HistoryEntry is one finished match for the history view: the session with its
+// activity, the teams as drawn and the winning team's label.
+type HistoryEntry struct {
+	Session    *Session
+	Activity   *activity.Activity
+	Teams      []Team
+	WinnerTeam string
+}
+
+// Stat is one player's tally across finished matches (a leaderboard row).
+type Stat struct {
+	DisplayName string
+	Played      int
+	Wins        int
+}
+
+// History is the view model for the history/stats page: recent finished matches,
+// a per-player leaderboard and the total number of matches played.
+type History struct {
+	Entries []HistoryEntry
+	Stats   []Stat
+	Total   int
 }
 
 // groupTeams buckets participants by their team label (A, B, ...) in order.

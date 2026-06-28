@@ -46,7 +46,8 @@ func WithNotifier(n Notifier) Option {
 }
 
 // New builds a session Manager. expireMinutes seeds each session's expires_at
-// (enforcement lands in WP4); the default RNG is time-seeded.
+// (enforced by ExpireStale, driven by the server's reaper); the default RNG is
+// time-seeded.
 func New(st *store.Store, logger *zap.Logger, expireMinutes int, opts ...Option) *Manager {
 	m := &Manager{
 		repo:   NewRepository(st),
@@ -260,6 +261,114 @@ func (m *Manager) Finish(sessionID, userID, winnerTeam string) error {
 		FinishedBy: userID,
 	})
 	return nil
+}
+
+// ReRoll re-draws the teams of a DRAWN session and re-announces them. Only the
+// host may re-roll, and only while the round is still DRAWN (before Finish): it
+// is a "the draw felt unfair, shuffle again" escape hatch, not a way to change a
+// match that already happened.
+func (m *Manager) ReRoll(sessionID, userID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	s, err := m.repo.Get(sessionID)
+	if err != nil {
+		return err
+	}
+	if s == nil || s.Status != StatusDrawn {
+		return ErrSessionNotDrawn
+	}
+	if s.CreatorID != userID {
+		return ErrNotCreator
+	}
+
+	act, err := m.acts.GetByID(s.ActivityID)
+	if err != nil {
+		return err
+	}
+	parts, err := m.repo.Participants(sessionID)
+	if err != nil {
+		return err
+	}
+
+	ids := make([]string, len(parts))
+	for i, p := range parts {
+		ids[i] = p.UserID
+	}
+	teams := drawTeams(ids, act.TeamSize, m.rng)
+	// ApplyDraw rewrites every participant's team (all are listed) and re-asserts
+	// DRAWN, so it doubles as the re-roll persistence step.
+	if err := m.repo.ApplyDraw(sessionID, teams); err != nil {
+		return err
+	}
+
+	drawn, err := m.repo.Participants(sessionID)
+	if err != nil {
+		return err
+	}
+	m.logger.Info("teams re-rolled", zap.String("session", sessionID), zap.String("by", userID))
+	m.notify.TeamsDrawn(TeamsDrawnEvent{
+		Session:  s,
+		Activity: act,
+		Teams:    groupTeams(drawn),
+	})
+	return nil
+}
+
+// ExpireStale flips OPEN sessions past their expiry to EXPIRED and returns how
+// many were closed. Called periodically by the server's reaper so abandoned
+// rounds (someone started one and nobody joined) free the table on their own.
+func (m *Manager) ExpireStale() (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	ids, err := m.repo.ExpireStale(time.Now())
+	if err != nil {
+		return 0, err
+	}
+	for _, id := range ids {
+		m.logger.Info("session expired", zap.String("session", id))
+	}
+	return len(ids), nil
+}
+
+// History builds the history/stats view model: the most recent finished matches
+// (up to limit, with their teams), a per-player leaderboard and the all-time
+// match count.
+func (m *Manager) History(limit int) (*History, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	sessions, err := m.repo.FinishedSessions(limit)
+	if err != nil {
+		return nil, err
+	}
+
+	h := &History{}
+	for _, s := range sessions {
+		act, err := m.acts.GetByID(s.ActivityID)
+		if err != nil {
+			return nil, err
+		}
+		parts, err := m.repo.Participants(s.ID)
+		if err != nil {
+			return nil, err
+		}
+		h.Entries = append(h.Entries, HistoryEntry{
+			Session:    s,
+			Activity:   act,
+			Teams:      groupTeams(parts),
+			WinnerTeam: s.WinnerTeam,
+		})
+	}
+
+	if h.Stats, err = m.repo.Leaderboard(); err != nil {
+		return nil, err
+	}
+	if h.Total, err = m.repo.CountFinished(); err != nil {
+		return nil, err
+	}
+	return h, nil
 }
 
 // validTeam reports whether label matches one of the drawn teams.

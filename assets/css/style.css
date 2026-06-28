@@ -75,6 +75,10 @@ footer {
     font-size: 1.25rem;
 }
 
+.team-winner {
+    border: 2px solid var(--pico-primary);
+}
+
 /* Orange color for light color scheme (Default) */
 /* Can be forced with data-theme="light" */
 [data-theme=light],

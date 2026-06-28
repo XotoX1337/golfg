@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -273,5 +274,153 @@ func TestFinishRejectsWhenNotDrawn(t *testing.T) {
 
 	if err := mgr.Finish(s.ID, anton, "A"); !errors.Is(err, ErrSessionNotDrawn) {
 		t.Fatalf("Finish on open session = %v, want ErrSessionNotDrawn", err)
+	}
+}
+
+// backdateExpiry pushes a session's expires_at into the past so ExpireStale
+// treats it as timed out.
+func backdateExpiry(t *testing.T, mgr *Manager, sessionID string) {
+	t.Helper()
+	if _, err := mgr.repo.db.Exec(
+		`UPDATE sessions SET expires_at = ? WHERE id = ?`,
+		time.Now().Add(-time.Minute).UTC(), sessionID,
+	); err != nil {
+		t.Fatalf("backdate expiry: %v", err)
+	}
+}
+
+func TestExpireStaleClosesTimedOutOpenSession(t *testing.T) {
+	mgr, users := newTestEnv(t)
+	anton := mkUser(t, users, "Anton")
+
+	s, _ := mgr.Start(anton)
+	backdateExpiry(t, mgr, s.ID)
+
+	n, err := mgr.ExpireStale()
+	if err != nil {
+		t.Fatalf("ExpireStale: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("expired %d sessions, want 1", n)
+	}
+
+	got, _ := mgr.repo.Get(s.ID)
+	if got.Status != StatusExpired {
+		t.Errorf("status = %q, want EXPIRED", got.Status)
+	}
+	// The table is free again and a new round can start.
+	if lb, _ := mgr.Lobby(anton); lb.HasSession {
+		t.Errorf("expired session should not be active, got %+v", lb)
+	}
+}
+
+func TestExpireStaleLeavesDrawnSessions(t *testing.T) {
+	mgr, users := newTestEnv(t)
+	s, _ := fillToDrawn(t, mgr, users)
+
+	// A drawn (in-progress) match must not be reaped, even past its expiry.
+	backdateExpiry(t, mgr, s.ID)
+
+	n, err := mgr.ExpireStale()
+	if err != nil {
+		t.Fatalf("ExpireStale: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("expired %d sessions, want 0 (drawn is immune)", n)
+	}
+	if got, _ := mgr.repo.Get(s.ID); got.Status != StatusDrawn {
+		t.Errorf("status = %q, want DRAWN", got.Status)
+	}
+}
+
+func TestReRollKeepsValidDrawAndStaysDrawn(t *testing.T) {
+	mgr, users := newTestEnv(t)
+	s, ids := fillToDrawn(t, mgr, users)
+
+	if err := mgr.ReRoll(s.ID, ids[0]); err != nil {
+		t.Fatalf("ReRoll by host: %v", err)
+	}
+
+	lb, _ := mgr.Lobby(ids[0])
+	if !lb.IsDrawn || len(lb.Teams) != 2 {
+		t.Fatalf("after re-roll want a drawn 2-team session, got %+v", lb)
+	}
+	assigned := map[string]string{}
+	for _, team := range lb.Teams {
+		if len(team.Members) != 2 {
+			t.Errorf("team %s has %d members, want 2", team.Label, len(team.Members))
+		}
+		for _, m := range team.Members {
+			assigned[m.UserID] = team.Label
+		}
+	}
+	if len(assigned) != 4 {
+		t.Errorf("got %d players assigned, want 4", len(assigned))
+	}
+}
+
+func TestReRollRejectsNonCreator(t *testing.T) {
+	mgr, users := newTestEnv(t)
+	s, ids := fillToDrawn(t, mgr, users)
+
+	if err := mgr.ReRoll(s.ID, ids[1]); !errors.Is(err, ErrNotCreator) {
+		t.Fatalf("ReRoll by non-host = %v, want ErrNotCreator", err)
+	}
+}
+
+func TestReRollRejectsWhenNotDrawn(t *testing.T) {
+	mgr, users := newTestEnv(t)
+	anton := mkUser(t, users, "Anton")
+	s, _ := mgr.Start(anton) // OPEN
+
+	if err := mgr.ReRoll(s.ID, anton); !errors.Is(err, ErrSessionNotDrawn) {
+		t.Fatalf("ReRoll on open session = %v, want ErrSessionNotDrawn", err)
+	}
+}
+
+func TestHistoryListsFinishedMatchesAndStats(t *testing.T) {
+	mgr, users := newTestEnv(t)
+	s, ids := fillToDrawn(t, mgr, users)
+	if err := mgr.Finish(s.ID, ids[0], "A"); err != nil {
+		t.Fatalf("Finish: %v", err)
+	}
+
+	h, err := mgr.History(10)
+	if err != nil {
+		t.Fatalf("History: %v", err)
+	}
+	if h.Total != 1 || len(h.Entries) != 1 {
+		t.Fatalf("history total=%d entries=%d, want 1/1", h.Total, len(h.Entries))
+	}
+	e := h.Entries[0]
+	if e.WinnerTeam != "A" || len(e.Teams) != 2 {
+		t.Errorf("entry winner=%q teams=%d, want A/2", e.WinnerTeam, len(e.Teams))
+	}
+
+	if len(h.Stats) != 4 {
+		t.Fatalf("leaderboard has %d players, want 4", len(h.Stats))
+	}
+	var totalWins, totalPlayed int
+	for _, st := range h.Stats {
+		totalWins += st.Wins
+		totalPlayed += st.Played
+	}
+	if totalPlayed != 4 {
+		t.Errorf("total played = %d, want 4", totalPlayed)
+	}
+	if totalWins != 2 { // the two members of winning team A
+		t.Errorf("total wins = %d, want 2", totalWins)
+	}
+}
+
+func TestHistoryEmptyWhenNothingFinished(t *testing.T) {
+	mgr, _ := newTestEnv(t)
+
+	h, err := mgr.History(10)
+	if err != nil {
+		t.Fatalf("History: %v", err)
+	}
+	if h.Total != 0 || len(h.Entries) != 0 || len(h.Stats) != 0 {
+		t.Errorf("empty history want zeros, got %+v", h)
 	}
 }

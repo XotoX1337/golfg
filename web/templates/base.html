@@ -19,6 +19,7 @@
             {{ if .CurrentUser }}
             <ul>
                 <li style="color:white">{{ .CurrentUser.DisplayName }}</li>
+                <li><a href="/history" role="button" class="secondary outline">{{ call .T "nav_history" }}</a></li>
                 <li><a href="/auth/logout" role="button" class="secondary">{{ call .T "nav_logout" }}</a></li>
             </ul>
             {{ end }}
