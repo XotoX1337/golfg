@@ -10,6 +10,7 @@ import (
 	"github.com/XotoX1337/golfg/internal/config"
 	"github.com/XotoX1337/golfg/internal/session"
 	"github.com/XotoX1337/golfg/internal/store"
+	"github.com/XotoX1337/golfg/internal/teams"
 	"github.com/XotoX1337/golfg/web"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
@@ -55,7 +56,10 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 		return nil, err
 	}
 
-	sessionMgr := session.New(st, logger, cfg.Session.ExpireMinutes)
+	// Teams notifier: posts session events to the configured webhook, or logs
+	// them when none is set (graceful degradation).
+	notifier := teams.New(cfg.Teams.WebhookURL, cfg.App.BaseURL, logger)
+	sessionMgr := session.New(st, logger, cfg.Session.ExpireMinutes, session.WithNotifier(notifier))
 
 	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr, sessions: sessionMgr}
 	s.routes(staticFS)

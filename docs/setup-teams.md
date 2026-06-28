@@ -1,0 +1,143 @@
+# Setting up Teams notifications
+
+This guide sets up a **Microsoft Teams** channel that receives go LFG's posts —
+"someone wants to play" and "teams are set" — each with a deep-link back into the
+app. go LFG only ever **sends** to Teams (an outbound webhook); there are no
+bots, no callbacks, and all interaction happens in the app itself.
+
+> **You don't need this to try the app.** With `[teams]` left empty, go LFG runs
+> fine — the posts are just written to the log instead of Teams (look for
+> `teams post (log only, no webhook)`). The webhook is only needed if you want the
+> announcements to actually show up in a channel.
+
+Microsoft retired the old *"Incoming Webhook"* Office 365 connectors. The current
+mechanism is a **Power Automate workflow** triggered by an HTTP request, which is
+what this guide uses.
+
+## What you'll end up with
+
+One value that goes into your config (or an environment variable):
+
+| Value | Where it comes from | Config key | Env var |
+|-------|--------------------|------------|---------|
+| Webhook URL | Power Automate workflow (below) | `teams.webhook_url` | `GOLFG_TEAMS_WEBHOOK_URL` |
+
+You also want `app.base_url` set to the app's public URL so the deep-link buttons
+in the cards point somewhere useful.
+
+## 1. Create the "Kickern" channel
+
+In the Teams team of your choice, create (or pick) a channel — e.g. **Kickern** —
+where the announcements should land. Anyone who should see "let's play" pings
+needs to be a member of that channel.
+
+## 2. Create the workflow from the channel
+
+The quickest path uses the built-in template:
+
+1. In Teams, open the **Kickern** channel.
+2. Click the **•••** (more options) next to the channel name → **Workflows**
+   (or **Manage channel → Workflows**).
+3. Search for and select the template
+   **"Post to a channel when a webhook request is received"**.
+4. Confirm the connection (sign in if prompted), pick the **Team** and the
+   **Kickern** channel as the target, then **Add workflow / Create**.
+5. Teams shows a **URL** — this is your webhook. **Copy it now** and keep it
+   secret; anyone with the URL can post to the channel. This goes into
+   `teams.webhook_url`.
+
+That template's flow already takes the incoming request body and posts its
+Adaptive Card attachment to the channel, which is exactly the shape go LFG sends
+(see [Payload format](#payload-format) below) — no further editing required.
+
+> Don't see "Workflows"? You can also start from
+> [Power Automate](https://make.powerautomate.com) → **Create → Instant cloud
+> flow** → trigger **"When a Teams webhook request is received"**, then add a
+> **"Post card in a chat or channel"** action posting the trigger's
+> `attachments`. See the manual setup note below.
+
+## 3. Put the URL into go LFG's config
+
+In `golfg.toml` (next to the binary):
+
+```toml
+[app]
+base_url = "https://kicker.intranet"   # used for the deep-link button in cards
+
+[teams]
+webhook_url = ""                        # leave empty here; inject via ENV
+```
+
+Then provide the secret URL via environment variable when starting the app:
+
+```bash
+export GOLFG_TEAMS_WEBHOOK_URL="<the workflow URL from step 2>"
+./golfg
+```
+
+Everything can be supplied via ENV instead of the file, using the scheme
+`GOLFG_<SECTION>_<KEY>`. ENV always wins over the file — handy for containers.
+**Never commit the webhook URL** — it contains a secret token; only the
+placeholder in `golfg.example.toml` belongs in the repo.
+
+## 4. Test it
+
+1. Start go LFG. Start a session ("I want to play") — within a moment a card
+   should appear in the **Kickern** channel:
+   *"⚽ Anton wants to play Tischfußball — 3 spot(s) left"* with a **Join the
+   game** button.
+2. Fill the session (4 players). A second card appears:
+   *"It's on! Teams are set — Team A: … — Team B: …"*.
+3. Click a card button — it should open `app.base_url` and land you in the lobby.
+
+If nothing appears, check the app log: a successful send logs
+`teams post sent` with HTTP status `200`/`202`; failures log `teams: post failed`
+or `teams: unexpected status`. Posts are best-effort and asynchronous, so a
+broken webhook never blocks or crashes the app.
+
+## Payload format
+
+go LFG POSTs JSON the Power-Automate "Teams webhook" trigger understands: a
+message whose single attachment is an Adaptive Card. Knowing the shape helps if
+you build the flow manually or want to customize the card:
+
+```json
+{
+  "type": "message",
+  "attachments": [
+    {
+      "contentType": "application/vnd.microsoft.card.adaptive",
+      "content": {
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "body": [
+          { "type": "TextBlock", "text": "⚽ Anton wants to play Tischfußball", "size": "Large", "weight": "Bolder", "wrap": true },
+          { "type": "TextBlock", "text": "3 spot(s) left — join in!", "wrap": true }
+        ],
+        "actions": [
+          { "type": "Action.OpenUrl", "title": "Join the game", "url": "https://kicker.intranet/" }
+        ]
+      }
+    }
+  ]
+}
+```
+
+A **manual** Power Automate flow should therefore: trigger on
+**"When a Teams webhook request is received"**, then **"Post card in a chat or
+channel"** using `triggerBody()?['attachments']` (the first attachment's
+`content`) as the Adaptive Card.
+
+## Notes & troubleshooting
+
+- **Sparse on purpose:** go LFG only posts on **session start** and **teams
+  drawn**. Joins and leaves are visible live in the app, and the match result is
+  logged only — so the channel doesn't get noisy.
+- **Outbound only / intranet hosting is fine:** the app just makes an outbound
+  HTTPS POST to the workflow URL. Microsoft never calls back into the app, so the
+  server does not need to be reachable from the internet.
+- **Keep the URL secret:** it's a bearer credential. Rotate it by deleting and
+  recreating the workflow if it leaks, then update `GOLFG_TEAMS_WEBHOOK_URL`.
+- **Deep-links go to the lobby:** there is one active session at a time, so the
+  card button links to `app.base_url`, which shows the current session.

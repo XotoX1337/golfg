@@ -101,10 +101,36 @@ func (m *Manager) Start(creatorID string) (*Session, error) {
 		return nil, err
 	}
 	// A single-seat activity would be "full" immediately; handle it uniformly.
-	if err := m.maybeDraw(s, act); err != nil {
+	drawn, err := m.maybeDraw(s, act)
+	if err != nil {
 		return nil, err
 	}
 	m.logger.Info("session started", zap.String("session", s.ID), zap.String("creator", creatorID))
+
+	// Announce the open session unless it drew immediately (the draw already
+	// fired its own event in maybeDraw). For the normal kicker flow it stays
+	// OPEN with one player, so this is the "X wants to play, n spots left" post.
+	if !drawn {
+		parts, err := m.repo.Participants(s.ID)
+		if err != nil {
+			return nil, err
+		}
+		var creator Participant
+		for _, p := range parts {
+			if p.UserID == creatorID {
+				creator = p
+				break
+			}
+		}
+		m.notify.SessionStarted(SessionStartedEvent{
+			Session:   s,
+			Activity:  act,
+			Creator:   creator,
+			Count:     len(parts),
+			Required:  act.RequiredPlayers,
+			FreeSlots: act.RequiredPlayers - len(parts),
+		})
+	}
 	return s, nil
 }
 
@@ -145,7 +171,7 @@ func (m *Manager) Join(sessionID, userID string) error {
 	if err := m.repo.AddParticipant(sessionID, userID); err != nil {
 		return err
 	}
-	if err := m.maybeDraw(s, act); err != nil {
+	if _, err := m.maybeDraw(s, act); err != nil {
 		return err
 	}
 	m.logger.Info("user joined session", zap.String("session", sessionID), zap.String("user", userID))
@@ -292,15 +318,17 @@ func (m *Manager) Lobby(currentUserID string) (*Lobby, error) {
 }
 
 // maybeDraw runs the team draw and flips the session to DRAWN once the required
-// player count is reached. Callers must hold m.mu (so the RNG is used safely and
-// the count→draw step is atomic against concurrent joins).
-func (m *Manager) maybeDraw(s *Session, act *activity.Activity) error {
+// player count is reached, returning whether a draw happened. On a successful
+// draw it fires the TeamsDrawn notification (it is the single place the draw
+// occurs, reached from both Start and Join). Callers must hold m.mu (so the RNG
+// is used safely and the count→draw step is atomic against concurrent joins).
+func (m *Manager) maybeDraw(s *Session, act *activity.Activity) (bool, error) {
 	parts, err := m.repo.Participants(s.ID)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if len(parts) < act.RequiredPlayers {
-		return nil
+		return false, nil
 	}
 
 	ids := make([]string, len(parts))
@@ -309,8 +337,21 @@ func (m *Manager) maybeDraw(s *Session, act *activity.Activity) error {
 	}
 	teams := drawTeams(ids, act.TeamSize, m.rng)
 	if err := m.repo.ApplyDraw(s.ID, teams); err != nil {
-		return err
+		return false, err
 	}
+	s.Status = StatusDrawn
 	m.logger.Info("teams drawn", zap.String("session", s.ID), zap.Int("teams", len(teams)))
-	return nil
+
+	// Re-read participants so the event carries their drawn team labels and
+	// display names (for "Team A: … vs Team B: …").
+	drawn, err := m.repo.Participants(s.ID)
+	if err != nil {
+		return true, err
+	}
+	m.notify.TeamsDrawn(TeamsDrawnEvent{
+		Session:  s,
+		Activity: act,
+		Teams:    groupTeams(drawn),
+	})
+	return true, nil
 }
