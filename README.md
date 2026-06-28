@@ -11,19 +11,28 @@ It's a single self-contained binary (HTML templates and static assets are embedd
 
 1. Open the app on the intranet → you're recognized via **Entra SSO** (name/email from M365).
 2. Start a **session** ("I want to play") → the app posts to the Teams channel with a deep link.
-3. Colleagues open the app, see the open session **live**, and join.
-4. At **4 players** the app **draws 2v2**, closes the session, and posts the result to Teams.
+3. Colleagues open the app, see the open session **live**, and join (or leave again before it fills).
+4. At **4 players** the app **draws 2v2** and posts the teams to Teams. Not happy with the draw?
+   The host can **re-roll**.
+5. After the match, a player records **who won** — results feed a per-player **leaderboard** on the
+   history page.
 
-Teams is purely a notification channel — all interaction happens in the app. The app also runs
-**without** Entra/Teams configured (graceful degradation: Teams posts are just logged, auth is
-optional in dev mode), so it can be tried out standalone.
+Open sessions that never fill **auto-expire** after a configurable timeout. Teams is purely a
+notification channel — all interaction happens in the app. The app also runs **without** Entra/Teams
+configured (graceful degradation: Teams posts are just logged, auth is optional in dev mode), so it
+can be tried out standalone.
+
+The UI is mobile-first, **light/dark**, available in **English and German** (auto-detected, with a
+switcher), and **white-label** — app name and accent color are configurable so anyone can re-brand
+it.
 
 ## Tech stack
 
 | Area | Choice |
 |---|---|
 | Language / web | Go + Fiber v2 |
-| UI | htmx + Go templates |
+| UI | htmx + Go templates (live updates via polling) |
+| i18n | go-i18n (English + German, embedded TOML catalogs) |
 | Persistence | SQLite (`modernc.org/sqlite`, pure Go — no CGo) |
 | Auth | Entra ID / OIDC |
 | Config | viper (TOML file + ENV) |
@@ -58,6 +67,10 @@ host = "0.0.0.0"
 port = 9000
 base_url = "https://kicker.intranet"   # for Teams deep links
 
+[branding]        # white-label the public app (no secrets)
+app_name = ""                            # empty = "go LFG"
+accent_color = ""                        # any CSS color; empty = default teal
+
 [auth]            # leave empty = dev mode without SSO
 tenant_id = ""
 client_id = ""
@@ -67,11 +80,20 @@ client_secret = ""                       # prefer ENV: GOLFG_AUTH_CLIENT_SECRET
 webhook_url = ""                         # prefer ENV: GOLFG_TEAMS_WEBHOOK_URL
 
 [session]
-expire_minutes = 30
+expire_minutes = 30                      # 0 = never auto-expire
+cookie_secure = false                    # set true in production behind HTTPS
 ```
 
 The binary keeps its config, log and database files (`golfg.toml`, `golfg.log`, `golfg.db`)
 **next to the executable**. Override the port at runtime with `--port`/`-p` or `GOLFG_APP_PORT`.
+
+### Naming
+
+`golfg` is the **project name** (Go + LFG) — it's only the repo, module path and `GOLFG_*` config
+prefix. The running app shows whatever you set as `[branding].app_name`, and in day-to-day use it's
+really called after the host it lives on. Point it at `kicker.intra.net`, set `app_name = "Kicker"`,
+and "hey, lass kickern!" is all your colleagues need — no global product name required. White-label
+it freely.
 
 ## Deployment
 
