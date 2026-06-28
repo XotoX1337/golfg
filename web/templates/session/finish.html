@@ -1,0 +1,31 @@
+{{ define "finish-modal" }}
+{{ with .Lobby }}
+{{ if and .IsDrawn .Joined }}
+<dialog open>
+  <article>
+    <header>
+      <button aria-label="Close" rel="prev" onclick="this.closest('dialog').remove()"></button>
+      <strong>Who won?</strong>
+    </header>
+    <form method="post" action="/session/finish" hx-post="/session/finish" hx-target="#session" hx-swap="outerHTML">
+      <input type="hidden" name="session_id" value="{{ .Session.ID }}"/>
+      <fieldset class="team-select">
+        {{ range .Teams }}
+        <label class="team-option">
+          <input type="radio" name="winner" value="{{ .Label }}" required/>
+          <strong>Team {{ .Label }}</strong>
+          <small>{{ range $i, $m := .Members }}{{ if $i }}, {{ end }}{{ $m.DisplayName }}{{ end }}</small>
+        </label>
+        {{ end }}
+      </fieldset>
+      <footer class="grid">
+        <button type="button" class="btn-danger" onclick="this.closest('dialog').remove()">Cancel</button>
+        <button type="submit">End match</button>
+      </footer>
+    </form>
+  </article>
+</dialog>
+{{ end }}
+{{ end }}
+{{ end }}
+{{ template "finish-modal" . }}

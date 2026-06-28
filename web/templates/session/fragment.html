@@ -1,0 +1,65 @@
+{{ define "session-fragment" }}
+<div id="session" hx-get="/session" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML">
+{{ with .Lobby }}
+  {{ if .IsDrawn }}
+  <article>
+    <hgroup>
+      <h2>Teams are set! ⚽</h2>
+      <p>{{ .Activity.Name }} — good luck.</p>
+    </hgroup>
+    <div class="grid">
+      {{ range .Teams }}
+      <article>
+        <header><strong>Team {{ .Label }}</strong></header>
+        <ul>
+          {{ range .Members }}<li><i class="ri-user-fill"></i> {{ .DisplayName }}</li>{{ end }}
+        </ul>
+      </article>
+      {{ end }}
+    </div>
+    {{ if .Joined }}
+    <button class="secondary" hx-get="/session/finish" hx-target="#modal" hx-swap="innerHTML">End match</button>
+    {{ else }}
+    <p><small>A match is in progress — wait for it to end before starting a new round.</small></p>
+    {{ end }}
+  </article>
+  {{ else if .IsOpen }}
+  {{ $creator := .Session.CreatorID }}
+  <article>
+    <hgroup>
+      <h2>{{ .Activity.Name }}</h2>
+      <p>Open lobby — {{ .Count }} / {{ .Required }} players</p>
+    </hgroup>
+    <progress value="{{ .Count }}" max="{{ .Required }}"></progress>
+    <ul>
+      {{ range .Participants }}
+      <li><i class="ri-user-fill"></i> {{ .DisplayName }}{{ if eq .UserID $creator }} <small>(host)</small>{{ end }}</li>
+      {{ end }}
+    </ul>
+    {{ if .Joined }}
+    <form method="post" action="/session/leave" hx-post="/session/leave" hx-target="#session" hx-swap="outerHTML">
+      <input type="hidden" name="session_id" value="{{ .Session.ID }}"/>
+      <button type="submit" class="secondary btn-danger">Leave</button>
+    </form>
+    {{ else }}
+    <form method="post" action="/session/join" hx-post="/session/join" hx-target="#session" hx-swap="outerHTML">
+      <input type="hidden" name="session_id" value="{{ .Session.ID }}"/>
+      <button type="submit">Join</button>
+    </form>
+    {{ end }}
+  </article>
+  {{ else }}
+  <article class="grid-center">
+    <hgroup>
+      <h2>Nobody's up for a game right now 😴</h2>
+      <p>Be the one to get a round going.</p>
+    </hgroup>
+    <form method="post" action="/session/start" hx-post="/session/start" hx-target="#session" hx-swap="outerHTML">
+      <button type="submit">⚽ I want to play</button>
+    </form>
+  </article>
+  {{ end }}
+{{ end }}
+</div>
+{{ end }}
+{{ template "session-fragment" . }}

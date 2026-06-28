@@ -8,6 +8,7 @@ import (
 
 	"github.com/XotoX1337/golfg/internal/auth"
 	"github.com/XotoX1337/golfg/internal/config"
+	"github.com/XotoX1337/golfg/internal/session"
 	"github.com/XotoX1337/golfg/internal/store"
 	"github.com/XotoX1337/golfg/web"
 	"github.com/gofiber/fiber/v2"
@@ -18,11 +19,12 @@ import (
 
 // Server bundles the Fiber app with its dependencies.
 type Server struct {
-	app    *fiber.App
-	cfg    *config.Config
-	store  *store.Store
-	logger *zap.Logger
-	auth   *auth.Manager
+	app      *fiber.App
+	cfg      *config.Config
+	store    *store.Store
+	logger   *zap.Logger
+	auth     *auth.Manager
+	sessions *session.Manager
 }
 
 // New constructs the Fiber app, registers the template engine, routes and the
@@ -53,7 +55,9 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 		return nil, err
 	}
 
-	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr}
+	sessionMgr := session.New(st, logger, cfg.Session.ExpireMinutes)
+
+	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr, sessions: sessionMgr}
 	s.routes(staticFS)
 	return s, nil
 }
@@ -67,6 +71,12 @@ func (s *Server) routes(staticFS fs.FS) {
 
 	// Protected app routes require a logged-in user.
 	s.app.Get("/", s.auth.RequireAuth, s.showIndex)
+	s.app.Get("/session", s.auth.RequireAuth, s.showSessionFragment)
+	s.app.Post("/session/start", s.auth.RequireAuth, s.startSession)
+	s.app.Post("/session/join", s.auth.RequireAuth, s.joinSession)
+	s.app.Post("/session/leave", s.auth.RequireAuth, s.leaveSession)
+	s.app.Get("/session/finish", s.auth.RequireAuth, s.showFinishModal)
+	s.app.Post("/session/finish", s.auth.RequireAuth, s.finishSession)
 
 	// Serve embedded static assets as a catch-all (must be registered last).
 	s.app.Use("/", filesystem.New(filesystem.Config{

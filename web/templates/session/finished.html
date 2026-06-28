@@ -1,0 +1,4 @@
+{{/* Response to POST /session/finish: refresh the live fragment and clear the
+     modal container out-of-band (the dialog lives outside #session). */}}
+{{ template "session-fragment" . }}
+<div id="modal" hx-swap-oob="true"></div>

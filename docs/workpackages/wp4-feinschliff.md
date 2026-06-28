@@ -16,6 +16,13 @@ WP0–WP3 abgeschlossen.
    nur Creator). Ergebnis aktualisiert UI und – falls gewünscht – Teams-Post.
 3. **Historie/Stats** (simpel): vergangene Sessions auflisten (wer, wann, welche Teams). Optional
    einfache Zähler ("X-mal gekickert"). Daten liegen bereits in SQLite.
+4. **Warteschlange**: während eine Session DRAWN (Tisch belegt) ist, können sich Nutzer **die
+   nicht der aktiven Session angehören** für die nächste Runde vormerken. Sobald die laufende
+   Partie via `Manager.Finish` auf `DONE` geht, wird aus der Warteschlange die nächste Runde
+   eröffnet (ggf. automatisch gewürfelt, sobald voll). Dockt am `Finish`-Flow an.
+5. **Punkte beim Abschluss**: das Finish-Modal (heute nur Gewinner-Team) um eine Eingabe der
+   Ergebnisse erweitern — Modus **best of 1** oder **best of 3** (Activity-Eigenschaft?). Resultat
+   in `sessions`/einer Score-Tabelle ablegen und über den `session.Notifier` (Teams) ausgeben.
 
 ## Akzeptanzkriterien
 - Offene Sessions verschwinden nach Ablauf zuverlässig (`EXPIRED`).

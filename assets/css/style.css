@@ -29,6 +29,52 @@ footer {
     color: #fff
 }
 
+.team-select {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.team-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: .25rem;
+    margin: 0;
+    padding: 1.25rem 1rem;
+    min-height: 110px;
+    cursor: pointer;
+    border: 2px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    transition: border-color .15s, background-color .15s;
+}
+
+.team-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.team-option:hover {
+    border-color: var(--pico-primary);
+}
+
+.team-option:has(input:checked) {
+    border-color: var(--pico-primary);
+    background-color: var(--pico-primary);
+    color: var(--pico-primary-inverse);
+}
+
+.team-option:has(input:checked) small {
+    color: var(--pico-primary-inverse);
+}
+
+.team-option strong {
+    font-size: 1.25rem;
+}
+
 /* Orange color for light color scheme (Default) */
 /* Can be forced with data-theme="light" */
 [data-theme=light],
