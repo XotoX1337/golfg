@@ -60,6 +60,9 @@ type TeamsConfig struct {
 
 type SessionConfig struct {
 	ExpireMinutes int `mapstructure:"expire_minutes"`
+	// CookieSecure marks the auth session cookie as Secure (HTTPS-only). Keep
+	// false for local http dev; set true in production behind HTTPS.
+	CookieSecure bool `mapstructure:"cookie_secure"`
 }
 
 // AuthEnabled reports whether SSO is configured. When false the app runs in
@@ -94,6 +97,7 @@ var envBindings = []struct {
 	{"auth.client_secret", "GOLFG_AUTH_CLIENT_SECRET", ""},
 	{"teams.webhook_url", "GOLFG_TEAMS_WEBHOOK_URL", ""},
 	{"session.expire_minutes", "GOLFG_SESSION_EXPIRE_MINUTES", 30},
+	{"session.cookie_secure", "GOLFG_SESSION_COOKIE_SECURE", false},
 }
 
 // Load reads configuration for the given data directory. It searches dataDir and

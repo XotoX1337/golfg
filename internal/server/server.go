@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/XotoX1337/golfg/internal/auth"
 	"github.com/XotoX1337/golfg/internal/config"
 	"github.com/XotoX1337/golfg/internal/store"
 	"github.com/XotoX1337/golfg/web"
@@ -21,6 +22,7 @@ type Server struct {
 	cfg    *config.Config
 	store  *store.Store
 	logger *zap.Logger
+	auth   *auth.Manager
 }
 
 // New constructs the Fiber app, registers the template engine, routes and the
@@ -46,13 +48,25 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 		Views:   engine,
 	})
 
-	s := &Server{app: app, cfg: cfg, store: st, logger: logger}
+	authMgr, err := auth.New(cfg, st, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr}
 	s.routes(staticFS)
 	return s, nil
 }
 
 func (s *Server) routes(staticFS fs.FS) {
-	s.app.Get("/", s.showIndex)
+	// Resolve the current user for every request so handlers and templates
+	// (header, logout link) can see who is logged in.
+	s.app.Use(s.auth.LoadUser)
+
+	s.auth.RegisterRoutes(s.app)
+
+	// Protected app routes require a logged-in user.
+	s.app.Get("/", s.auth.RequireAuth, s.showIndex)
 
 	// Serve embedded static assets as a catch-all (must be registered last).
 	s.app.Use("/", filesystem.New(filesystem.Config{

@@ -1,28 +1,9 @@
 {{ template "header" . }}
-<form>
-    <fieldset>
-      <label>
-        Name
-        <input
-          name="name"
-          placeholder="Name"
-          autocomplete="given-name"
-        />
-      </label>
-      <label>
-        Email
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          autocomplete="email"
-        />
-      </label>
-    </fieldset>
-  
-    <input
-      type="submit"
-      value="Kickern!"
-    />
-  </form>
+<article>
+    <hgroup>
+        <h2>Lobby</h2>
+        <p>Welcome, {{ .CurrentUser.DisplayName }} 👋</p>
+    </hgroup>
+    <p>You are logged in. The live kicker lobby — start a session, join, and roll the teams — arrives with the core loop (WP2).</p>
+</article>
 {{ template "footer" . }}

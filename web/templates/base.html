@@ -1,6 +1,6 @@
 {{ define "header" }}
 <!DOCTYPE html>
-<html lang="de" data-theme="light">
+<html lang="en" data-theme="light">
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <link rel="stylesheet" href="/css/app.min.css"/>
@@ -9,16 +9,27 @@
 </head>
 <body>
     <header>
-        <div class="grid grid-center">
-            <h1 style="color:white">GoLang Looking For Group</h1>
-        </div>
+        <nav class="container">
+            <ul>
+                <li><strong style="color:white">{{ Name }}</strong></li>
+                {{ if .DevMode }}
+                <li><small style="color:#fff;background:#dc3545;padding:2px 8px;border-radius:4px">DEV MODE</small></li>
+                {{ end }}
+            </ul>
+            {{ if .CurrentUser }}
+            <ul>
+                <li style="color:white">{{ .CurrentUser.DisplayName }}</li>
+                <li><a href="/auth/logout" role="button" class="secondary">Logout</a></li>
+            </ul>
+            {{ end }}
+        </nav>
     </header>
     <main class="container">
 {{ end }}
 {{ define "footer" }}
     </main>
     <footer>
-        <p>{{ Name }} {{Version}}</p>
+        <p>{{ Name }} {{ Version }}</p>
     </footer>
 </body>
 </html>

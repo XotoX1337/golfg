@@ -1,0 +1,24 @@
+{{ template "header" . }}
+<article>
+    <hgroup>
+        <h2>Developer Login</h2>
+        <p>SSO is not configured, so this is a local dev login. Type any name to continue — no password required.</p>
+    </hgroup>
+
+    {{ if .Error }}
+    <p style="color:var(--pico-del-color, #dc3545)">{{ .Error }}</p>
+    {{ end }}
+
+    <form method="post" action="/auth/dev-login">
+        <label>
+            Name
+            <input name="name" placeholder="e.g. Anton" autocomplete="name" required autofocus/>
+        </label>
+        <label>
+            Email <small>(optional)</small>
+            <input type="email" name="email" placeholder="anton@example.com" autocomplete="email"/>
+        </label>
+        <button type="submit">Continue</button>
+    </form>
+</article>
+{{ template "footer" . }}
