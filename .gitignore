@@ -34,6 +34,10 @@ golfg.db-wal
 # build output
 dist/
 
+# local test artifacts (curl cookie jars, scratch files)
+*.cookies
+cj.txt
+
 # IDE
 .idea/
 .vscode/
