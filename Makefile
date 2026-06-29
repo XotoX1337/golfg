@@ -18,6 +18,9 @@ compile:
 	GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o dist/golfg-windows-amd64.exe ./cmd/golfg
 	GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o dist/golfg-macos-amd64 ./cmd/golfg
 
+compress:
+	upx --best --lzma dist/golfg-linux-arm dist/golfg-linux-amd64 dist/golfg-windows-amd64.exe
+
 all: clean compile
 
 icon:

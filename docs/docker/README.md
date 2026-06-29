@@ -1,18 +1,22 @@
 # Docker deployment
 
-Run golfg as a container, built straight from this repository. The image is a
-small Alpine runtime wrapping the fully static Go binary (templates and static
-assets are embedded), with config, log and the SQLite database persisted on a
-named volume.
+Run golfg as a container. The image is a small Alpine runtime wrapping the
+**published release binary** (fully static, UPX-compressed, with templates and
+static assets embedded) — it does **not** compile from source. Config, log and
+the SQLite database are persisted on a named volume.
 
 Files in this directory:
 
 | File | Purpose |
 |---|---|
-| `Dockerfile` | Multi-stage build (Go → Alpine runtime). Build context is the **repo root**. |
+| `Dockerfile` | Alpine runtime that pulls the release binary (`ADD` from GitHub). Override the tag with `--build-arg GOLFG_VERSION=vX.Y.Z`. |
 | `docker-compose.yml` | One-command build + run with a persisted `golfg-data` volume. |
 | `entrypoint.sh` | Seeds config on first run, refreshes the binary, drops to an unprivileged user. |
 | `.env.example` | Template for secrets (auth / Teams). Copy to `.env`. |
+
+> The release ships a **linux/amd64** binary, so the image is amd64-only. For
+> ARM (e.g. a Raspberry Pi) use the [LXD guide](../lxd/README.md) or build from
+> source.
 
 ## Quick start (compose)
 
@@ -36,8 +40,9 @@ logged. Fill in `.env` to enable Entra auth and Teams notifications.
 ## Plain docker (no compose)
 
 ```bash
-# Build (context = repo root, so the build can see the Go sources)
-docker build -f docs/docker/Dockerfile -t golfg:latest .
+# Build (context = repo root for golfg.example.toml + entrypoint.sh; the binary
+# itself is pulled from the release). Override the tag with --build-arg if needed.
+docker build -f docs/docker/Dockerfile --build-arg GOLFG_VERSION=v1.0.0 -t golfg:latest .
 
 # Run with a persisted volume
 docker volume create golfg-data
@@ -74,8 +79,9 @@ that on one persisted volume *and* allow upgrades, `entrypoint.sh` runs the app
 from `/data` and copies a fresh binary out of the image on every start. So:
 
 - **Data persists** in the `golfg-data` volume across restarts.
-- **Upgrades are just** `up -d --build` (or pull a new image) — the refreshed
-  binary is picked up automatically; `golfg.db` is untouched.
+- **Upgrades**: bump `GOLFG_VERSION` (in `docker-compose.yml` or via
+  `--build-arg`) and run `up -d --build` — the image pulls the new release
+  binary and the entrypoint refreshes it on start; `golfg.db` is untouched.
 
 Back up the volume by copying out `/data/golfg.db` (e.g.
 `docker cp golfg:/data/golfg.db ./golfg.db.bak`).

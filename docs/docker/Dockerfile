@@ -1,29 +1,23 @@
 # syntax=docker/dockerfile:1
 
-# ---- build stage -------------------------------------------------------------
-FROM golang:1.25-alpine AS build
-WORKDIR /src
-
-# Resolve modules first so they stay cached across source-only changes.
-COPY go.mod go.sum ./
-RUN go mod download
-
-# modernc.org/sqlite is pure Go, so CGO stays off and the result is a fully
-# static binary (templates and static assets are embedded via //go:embed).
-COPY . .
-RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /out/golfg ./cmd/golfg
-
-# ---- runtime stage -----------------------------------------------------------
+# Runtime-only image: it ships the published release binary instead of compiling
+# from source. Pick the version with --build-arg GOLFG_VERSION=vX.Y.Z (default
+# below). The released binary is the fully static, UPX-compressed Linux build;
+# templates and static assets are embedded via //go:embed.
 FROM alpine:3.20
+
+ARG GOLFG_VERSION=v1.0.0
+ARG GOLFG_REPO=XotoX1337/golfg
 
 # su-exec lets the entrypoint fix volume ownership as root, then drop to an
 # unprivileged user before exec'ing the app. wget (busybox) backs the healthcheck.
-RUN apk add --no-cache su-exec \
+# ca-certificates is needed for the TLS calls golfg makes (Entra/OIDC, Teams).
+RUN apk add --no-cache su-exec ca-certificates \
     && adduser -D -H -u 10001 golfg
 
 # The canonical binary and example config live in the image; the actual data
 # (config, log, SQLite DB) lives in the /data volume — see entrypoint.sh.
-COPY --from=build /out/golfg /usr/local/bin/golfg
+ADD --chmod=0755 https://github.com/${GOLFG_REPO}/releases/download/${GOLFG_VERSION}/golfg-linux-amd64 /usr/local/bin/golfg
 COPY golfg.example.toml /usr/local/share/golfg/golfg.example.toml
 COPY docs/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

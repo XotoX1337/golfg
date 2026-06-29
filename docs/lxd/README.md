@@ -2,22 +2,29 @@
 
 LXD runs golfg in a lightweight **system container** (a full Ubuntu userspace
 with its own `systemd`), which suits golfg's "plain foreground process managed
-by an init system" model. You ship the cross-compiled Linux binary, run it as a
+by an init system" model. You ship the published Linux binary, run it as a
 systemd service inside the container, and expose the port to the host with a
 proxy device.
 
 This mirrors the [systemd setup in the main README](../../README.md#as-a-systemd-service),
 just inside a container.
 
-## 1. Build the Linux binary
+## 1. Get the Linux binary
 
-On your build machine:
+Download the latest released binary instead of building from source:
 
 ```bash
-make compile        # produces dist/golfg-linux-amd64 (and other targets)
+mkdir -p dist
+curl -fsSL -o dist/golfg-linux-amd64 \
+  https://github.com/XotoX1337/golfg/releases/latest/download/golfg-linux-amd64
 ```
 
-Use `dist/golfg-linux-arm` instead if the LXD host is ARM (e.g. a Raspberry Pi).
+The released binary is UPX-compressed and fully static — it runs as-is on the
+Ubuntu container. To pin a specific version, swap `latest` for a tag, e.g.
+`.../releases/download/v1.0.0/golfg-linux-amd64`.
+
+> The release only publishes **amd64**. If the LXD host is ARM (e.g. a Raspberry
+> Pi), build it yourself with `make compile` and push `dist/golfg-linux-arm`.
 
 ## 2. Launch a container
 

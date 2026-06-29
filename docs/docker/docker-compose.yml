@@ -1,13 +1,17 @@
 # docker compose -f docs/docker/docker-compose.yml up -d --build
 #
-# Builds the image from the repo (context is the repo root) and runs golfg with
-# a persisted data volume. Secrets go in docs/docker/.env (copy from .env.example);
-# everything in golfg.toml can also be set as a GOLFG_<SECTION>_<KEY> env var.
+# Builds a runtime image around the published release binary (no compiling) and
+# runs golfg with a persisted data volume. Pin the release with GOLFG_VERSION;
+# secrets go in docs/docker/.env (copy from .env.example); everything in
+# golfg.toml can also be set as a GOLFG_<SECTION>_<KEY> env var.
 services:
   golfg:
     build:
       context: ../..
       dockerfile: docs/docker/Dockerfile
+      args:
+        # Release tag to pull the binary from — override to upgrade.
+        GOLFG_VERSION: v1.0.0
     image: golfg:latest
     container_name: golfg
     restart: unless-stopped
