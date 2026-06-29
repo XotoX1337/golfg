@@ -13,7 +13,7 @@
         {{ range .Teams }}
         <label class="team-option">
           <input type="radio" name="winner" value="{{ .Label }}" required/>
-          <strong>{{ call $.T "team_label" "Label" .Label }}</strong>
+          <strong>{{ .Name }}</strong>
           <small>{{ range $i, $m := .Members }}{{ if $i }}, {{ end }}{{ $m.DisplayName }}{{ end }}</small>
         </label>
         {{ end }}

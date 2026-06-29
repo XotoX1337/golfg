@@ -42,7 +42,7 @@
     {{ range $i, $team := .Teams }}
     {{ if $i }}<div class="vs" aria-hidden="true">{{ call $.T "versus" }}</div>{{ end }}
     <article class="team-card{{ if eq $team.Label $winner }} team-winner{{ end }}">
-      <header>{{ call $.T "team_label" "Label" $team.Label }}{{ if eq $team.Label $winner }} 🏆{{ end }}</header>
+      <header>{{ $team.Name }}{{ if eq $team.Label $winner }} 🏆{{ end }}</header>
       <ul>
         {{ range $team.Members }}
         <li>
@@ -54,7 +54,7 @@
     </article>
     {{ end }}
   </div>
-  <footer><small>{{ call $.T "history_winner" "Team" $winner }}</small></footer>
+  {{ if .Winner }}<footer><small>{{ call $.T "history_winner" "Team" .Winner }}</small></footer>{{ end }}
 </article>
 {{ end }}
 {{ else }}

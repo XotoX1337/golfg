@@ -1,9 +1,9 @@
 # Setting up Teams notifications
 
 This guide sets up a **Microsoft Teams** channel that receives go LFG's posts —
-"someone wants to play" and "teams are set" — each with a deep-link back into the
-app. go LFG only ever **sends** to Teams (an outbound webhook); there are no
-bots, no callbacks, and all interaction happens in the app itself.
+"someone wants to play", "teams are set" and "match over" — each with a deep-link
+back into the app. go LFG only ever **sends** to Teams (an outbound webhook);
+there are no bots, no callbacks, and all interaction happens in the app itself.
 
 > **You don't need this to try the app.** With `[teams]` left empty, go LFG runs
 > fine — the posts are just written to the log instead of Teams (look for
@@ -21,6 +21,10 @@ One value that goes into your config (or an environment variable):
 | Value | Where it comes from | Config key | Env var |
 |-------|--------------------|------------|---------|
 | Webhook URL | Power Automate workflow (below) | `teams.webhook_url` | `GOLFG_TEAMS_WEBHOOK_URL` |
+
+The channel notification language is fixed by config (the channel has no
+per-request locale): `teams.lang` / `GOLFG_TEAMS_LANG`, `"en"` (default) or
+`"de"`.
 
 You also want `app.base_url` set to the app's public URL so the deep-link buttons
 in the cards point somewhere useful.
@@ -66,6 +70,7 @@ base_url = "https://kicker.intranet"   # used for the deep-link button in cards
 
 [teams]
 webhook_url = ""                        # leave empty here; inject via ENV
+lang = "en"                             # channel notification language: "en" or "de"
 ```
 
 Then provide the secret URL via environment variable when starting the app:
@@ -88,7 +93,9 @@ placeholder in `golfg.example.toml` belongs in the repo.
    game** button.
 2. Fill the session (4 players). A second card appears:
    *"It's on! Teams are set — Team A: … — Team B: …"*.
-3. Click a card button — it should open `app.base_url` and land you in the lobby.
+3. End the match in the app ("End match", pick a winner). A third card appears:
+   *"🏁 Match over! — 🏆 Team A won Tischfußball — …"*.
+4. Click a card button — it should open `app.base_url` and land you in the lobby.
 
 If nothing appears, check the app log: a successful send logs
 `teams post sent` with HTTP status `200`/`202`; failures log `teams: post failed`
@@ -131,9 +138,16 @@ channel"** using `triggerBody()?['attachments']` (the first attachment's
 
 ## Notes & troubleshooting
 
-- **Sparse on purpose:** go LFG only posts on **session start** and **teams
-  drawn**. Joins and leaves are visible live in the app, and the match result is
-  logged only — so the channel doesn't get noisy.
+- **Sparse on purpose:** go LFG posts on **session start**, **teams drawn** and
+  **match over**. Joins and leaves are visible live in the app and are not posted,
+  so the channel doesn't get noisy.
+- **"… used a Workflow template to send this card":** Power Automate adds this
+  attribution line (the workflow owner) automatically. It is **not** part of go
+  LFG's payload and cannot be removed from it — it's a property of the Workflows
+  posting mechanism. Removing it would mean posting via a different mechanism
+  (e.g. a dedicated bot), which is out of scope here.
+- **Notification language:** set `teams.lang` (`"en"`/`"de"`) to pick the channel
+  language; it is independent of each user's in-app UI language.
 - **Outbound only / intranet hosting is fine:** the app just makes an outbound
   HTTPS POST to the workflow URL. Microsoft never calls back into the app, so the
   server does not need to be reachable from the internet.

@@ -16,6 +16,7 @@ package session
 import (
 	"errors"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/XotoX1337/golfg/internal/activity"
@@ -71,6 +72,44 @@ type Team struct {
 	Members []Participant
 }
 
+// Name is the team's display name, built from its members' first names joined
+// with " & " (e.g. "Anton & Berta"). The internal Label ("A"/"B") stays the
+// stable identifier (winner value, comparisons); Name is purely for display. It
+// falls back to "Team <Label>" only when no member name is known, so a header is
+// never empty.
+func (t Team) Name() string {
+	names := make([]string, 0, len(t.Members))
+	for _, m := range t.Members {
+		if fn := firstName(m.DisplayName); fn != "" {
+			names = append(names, fn)
+		}
+	}
+	if len(names) == 0 {
+		return "Team " + t.Label
+	}
+	return strings.Join(names, " & ")
+}
+
+// firstName returns the first whitespace-separated token of a display name
+// ("Anton Müller" -> "Anton"), or "" when the name is empty.
+func firstName(displayName string) string {
+	if f := strings.Fields(displayName); len(f) > 0 {
+		return f[0]
+	}
+	return ""
+}
+
+// TeamName returns the display Name of the team carrying label, or the label
+// itself when no team matches (e.g. a tie, where there is no winning team).
+func TeamName(teams []Team, label string) string {
+	for _, t := range teams {
+		if t.Label == label {
+			return t.Name()
+		}
+	}
+	return label
+}
+
 // Lobby is the view model the templates render. It captures the whole live state
 // of the lobby for the current user in one struct.
 type Lobby struct {
@@ -94,6 +133,15 @@ type HistoryEntry struct {
 	Activity   *activity.Activity
 	Teams      []Team
 	WinnerTeam string
+}
+
+// Winner returns the display Name of the winning team, or "" for a tie (no
+// winner recorded), so the template can omit the winner line.
+func (e HistoryEntry) Winner() string {
+	if e.WinnerTeam == "" {
+		return ""
+	}
+	return TeamName(e.Teams, e.WinnerTeam)
 }
 
 // Stat is one player's tally across finished matches (a leaderboard row).
