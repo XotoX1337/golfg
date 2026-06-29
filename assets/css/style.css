@@ -347,10 +347,6 @@ footer.container {
   }
 }
 
-/* Fade the fragment slightly while a request is in flight (e.g. on action
-   clicks); polling refreshes are quick enough to stay invisible. */
-#session.htmx-request { opacity: .65; transition: opacity .15s ease; }
-
 /* ---- Mobile-first refinements ------------------------------------------ */
 /* Full-width, touch-friendly action buttons inside lobby cards. */
 .lobby-card form button,
