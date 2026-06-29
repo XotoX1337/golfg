@@ -71,7 +71,7 @@ base_url = "https://kicker.intranet"   # for Teams deep links
 app_name = ""                            # empty = "go LFG"
 accent_color = ""                        # any CSS color; empty = default teal
 play_cta = ""                            # custom "I want to play" button label; empty = localized default
-play_announcement = ""                   # custom Teams headline, template with {{.Name}}; empty = localized default
+play_announcement = ""                   # custom Teams "session started" headline; Go text/template, {{.Name}} = creator, e.g. "{{.Name}} wants to play!"; empty = localized default
 
 [auth]            # leave empty = dev mode without SSO
 tenant_id = ""
@@ -95,7 +95,7 @@ The binary keeps its config, log and database files (`golfg.toml`, `golfg.log`, 
 `golfg` is the **project name** (Go + LFG) — it's only the repo, module path and `GOLFG_*` config
 prefix. The running app shows whatever you set as `[branding].app_name`, and in day-to-day use it's
 really called after the host it lives on. Point it at `kicker.intra.net`, set `app_name = "Kicker"`,
-and "hey, lass kickern!" is all your colleagues need — no global product name required. White-label
+and "hey, let's play!" is all your colleagues need — no global product name required. White-label
 it freely.
 
 ## Deployment

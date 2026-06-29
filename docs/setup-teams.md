@@ -152,8 +152,8 @@ channel"** using `triggerBody()?['attachments']` (the first attachment's
   (or `GOLFG_BRANDING_PLAY_ANNOUNCEMENT`) to override the *"… wants to play …"*
   title line with your own wording. It is a small template with a single
   `{{.Name}}` placeholder for the creator's name, e.g.
-  `play_announcement = "{{.Name}} will kickern!"` → *"Frederic Leist will
-  kickern!"*. The value is a **fixed literal** — it is not translated, so
+  `play_announcement = "{{.Name}} wants to play!"` → *"Jane Doe wants to
+  play!"*. The value is a **fixed literal** — it is not translated, so
   `teams.lang` no longer affects this line (it still drives the "n spots left"
   subtitle and the other cards). An empty value, or an invalid template, falls
   back to the localized default (which also includes the activity name). The
