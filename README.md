@@ -99,7 +99,14 @@ it freely.
 
 golfg is built to run in a **container** (Docker / Linux LXD). It's a plain foreground HTTP
 server that shuts down gracefully on `SIGINT`/`SIGTERM`, so the container runtime or an init
-system manages its lifecycle.
+system manages its lifecycle. Pick a guide:
+
+- **[Docker / docker compose](docs/docker/)** — `docker compose up -d --build`; the image is
+  built from this repo and data is persisted on a volume.
+- **[LXD system container](docs/lxd/)** — ship the cross-compiled binary into an Ubuntu
+  container and run it as a systemd service.
+
+The bare-metal systemd setup below is the same pattern the LXD guide uses, without a container.
 
 ### As a systemd service
 

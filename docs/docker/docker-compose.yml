@@ -1,0 +1,35 @@
+# docker compose -f docs/docker/docker-compose.yml up -d --build
+#
+# Builds the image from the repo (context is the repo root) and runs golfg with
+# a persisted data volume. Secrets go in docs/docker/.env (copy from .env.example);
+# everything in golfg.toml can also be set as a GOLFG_<SECTION>_<KEY> env var.
+services:
+  golfg:
+    build:
+      context: ../..
+      dockerfile: docs/docker/Dockerfile
+    image: golfg:latest
+    container_name: golfg
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Public URL used for Teams deep links — set this to how users reach the app.
+      GOLFG_APP_BASE_URL: "http://localhost:9000"
+      # Set true when terminating HTTPS in front of the container.
+      GOLFG_SESSION_COOKIE_SECURE: "false"
+      # Secrets (auth / Teams) come from .env — see .env.example.
+    volumes:
+      - golfg-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  golfg-data:
