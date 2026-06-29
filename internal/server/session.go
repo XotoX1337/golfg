@@ -9,14 +9,23 @@ import (
 	"github.com/XotoX1337/golfg/internal/session"
 )
 
+// topPlayersLimit caps how many leaderboard rows the home page shows below the
+// lobby. The list collapses by itself when fewer players exist.
+const topPlayersLimit = 10
+
 // showIndex renders the full lobby page (header/footer + the live session
-// fragment). The fragment then keeps itself fresh via htmx polling.
+// fragment), plus a top-N leaderboard below it. The leaderboard sits outside the
+// polled fragment, so the 3s session refresh never reloads it.
 func (s *Server) showIndex(c *fiber.Ctx) error {
 	lb, err := s.lobby(c)
 	if err != nil {
 		return err
 	}
-	return c.Render("index/show", fiber.Map{"Lobby": lb})
+	top, err := s.sessions.TopPlayers(topPlayersLimit)
+	if err != nil {
+		return err
+	}
+	return c.Render("index/show", fiber.Map{"Lobby": lb, "Leaderboard": top})
 }
 
 // showSessionFragment renders just the live session fragment. This is the

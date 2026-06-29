@@ -2,6 +2,7 @@
 package server
 
 import (
+	"errors"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -69,6 +70,7 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 		}
 		return t.Local().Format("2006-01-02 15:04")
 	})
+	engine.AddFunc("dict", dict)
 
 	app := fiber.New(fiber.Config{
 		AppName: cfg.AppName(),
@@ -144,6 +146,24 @@ func initials(name string) string {
 	default:
 		return string([]rune{letters[0], letters[len(letters)-1]})
 	}
+}
+
+// dict builds a map from alternating key/value template arguments, so a partial
+// can be handed several named values at once (e.g. a translator plus a data
+// slice) — Go templates pass a single pipeline value to {{ template }}.
+func dict(pairs ...any) (map[string]any, error) {
+	if len(pairs)%2 != 0 {
+		return nil, errors.New("dict: needs an even number of arguments")
+	}
+	m := make(map[string]any, len(pairs)/2)
+	for i := 0; i < len(pairs); i += 2 {
+		key, ok := pairs[i].(string)
+		if !ok {
+			return nil, errors.New("dict: keys must be strings")
+		}
+		m[key] = pairs[i+1]
+	}
+	return m, nil
 }
 
 // openSlots returns a slice sized to the number of still-open player slots, so

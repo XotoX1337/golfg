@@ -74,11 +74,23 @@ func (r *Repository) CountFinished() (int, error) {
 	return n, err
 }
 
-// Leaderboard tallies each player's finished matches and wins (their team equals
-// the session's winning team), ranked by ELO rating (the primary criterion),
-// then wins and matches played. One small grouped query — the history page is
-// read-rarely and the data set is tiny.
+// Leaderboard tallies every player's finished matches and wins, ranked best
+// first. See leaderboard for the ranking criteria.
 func (r *Repository) Leaderboard() ([]Stat, error) {
+	return r.leaderboard(-1)
+}
+
+// TopPlayers returns the highest-ranked players, capped at limit, using the same
+// ranking as Leaderboard (a limit of -1 means no cap).
+func (r *Repository) TopPlayers(limit int) ([]Stat, error) {
+	return r.leaderboard(limit)
+}
+
+// leaderboard tallies each player's finished matches and wins (their team equals
+// the session's winning team), ranked by ELO rating (the primary criterion),
+// then wins and matches played, capped at limit (-1 = all). One small grouped
+// query — the leaderboard is read-rarely and the data set is tiny.
+func (r *Repository) leaderboard(limit int) ([]Stat, error) {
 	rows, err := r.db.Query(`
 		SELECT u.display_name,
 		       u.elo,
@@ -89,7 +101,8 @@ func (r *Repository) Leaderboard() ([]Stat, error) {
 		JOIN users u ON u.id = p.user_id
 		WHERE s.status = 'DONE'
 		GROUP BY p.user_id
-		ORDER BY u.elo DESC, wins DESC, played DESC, u.display_name`)
+		ORDER BY u.elo DESC, wins DESC, played DESC, u.display_name
+		LIMIT ?`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("leaderboard: %w", err)
 	}

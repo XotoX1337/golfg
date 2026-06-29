@@ -380,6 +380,16 @@ func (m *Manager) History(limit int) (*History, error) {
 	return h, nil
 }
 
+// TopPlayers returns the leaderboard's highest-ranked players, capped at limit,
+// ranked exactly like the history page's full leaderboard. The home page shows
+// this as a compact top-N below the lobby.
+func (m *Manager) TopPlayers(limit int) ([]Stat, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.repo.TopPlayers(limit)
+}
+
 // validTeam reports whether label matches one of the drawn teams.
 func validTeam(teams []Team, label string) bool {
 	for _, t := range teams {
