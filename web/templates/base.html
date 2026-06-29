@@ -28,6 +28,9 @@
     <style>:root{--brand-accent:{{ Accent }};}</style>
     <link rel="stylesheet" href="/css/app.min.css"/>
     <script defer src="/js/htmx.min.js#1.9.5"></script>
+    {{/* idiomorph: morph-style swaps so live polling patches only changed nodes
+         (no flicker, no click swallowed mid-swap). Registers hx-ext="morph". */}}
+    <script defer src="/js/idiomorph-ext.min.js"></script>
     <title>{{ Name }}</title>
 </head>
 <body>
@@ -53,7 +56,12 @@
                     <span class="current-user-name">{{ .CurrentUser.DisplayName }}</span>
                 </li>
                 <li><a href="/history" role="button" class="secondary outline" title="{{ call .T "nav_history" }}"><i class="ri-history-line"></i> <span class="label-md">{{ call .T "nav_history" }}</span></a></li>
+                {{/* Logout only clears the local session. Under SSO the browser is
+                     still signed in to Entra and would be re-authenticated silently,
+                     so the link would be a no-op — hide it and show it in dev mode only. */}}
+                {{ if .DevMode }}
                 <li><a href="/auth/logout" role="button" class="secondary outline" title="{{ call .T "nav_logout" }}"><i class="ri-logout-box-r-line"></i> <span class="label-md">{{ call .T "nav_logout" }}</span></a></li>
+                {{ end }}
                 {{ end }}
             </ul>
         </nav>

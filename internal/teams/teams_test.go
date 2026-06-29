@@ -5,13 +5,25 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/XotoX1337/golfg/internal/activity"
+	"github.com/XotoX1337/golfg/internal/i18n"
 	"github.com/XotoX1337/golfg/internal/session"
 	"go.uber.org/zap"
 )
+
+// testLocalizer builds an English notification translator for the tests.
+func testLocalizer(t *testing.T) *i18n.Localizer {
+	t.Helper()
+	b, err := i18n.New()
+	if err != nil {
+		t.Fatalf("load i18n bundle: %v", err)
+	}
+	return b.Localizer("en")
+}
 
 // captureServer returns a test webhook that pushes each received body onto a channel.
 func captureServer(t *testing.T) (*httptest.Server, chan []byte) {
@@ -38,7 +50,7 @@ func decode(t *testing.T, body []byte) adaptiveMessage {
 
 func TestSessionStartedPostsCard(t *testing.T) {
 	srv, bodies := captureServer(t)
-	c := New(srv.URL, "https://kicker.intranet/", zap.NewNop())
+	c := New(srv.URL, "https://kicker.intranet/", testLocalizer(t), zap.NewNop())
 
 	c.SessionStarted(session.SessionStartedEvent{
 		Session:   &session.Session{ID: "s1"},
@@ -72,7 +84,7 @@ func TestSessionStartedPostsCard(t *testing.T) {
 
 func TestTeamsDrawnListsBothTeams(t *testing.T) {
 	srv, bodies := captureServer(t)
-	c := New(srv.URL, "https://kicker.intranet", zap.NewNop())
+	c := New(srv.URL, "https://kicker.intranet", testLocalizer(t), zap.NewNop())
 
 	c.TeamsDrawn(session.TeamsDrawnEvent{
 		Session:  &session.Session{ID: "s1"},
@@ -98,6 +110,35 @@ func TestTeamsDrawnListsBothTeams(t *testing.T) {
 	}
 }
 
+func TestMatchFinishedPostsWinner(t *testing.T) {
+	srv, bodies := captureServer(t)
+	c := New(srv.URL, "https://kicker.intranet", testLocalizer(t), zap.NewNop())
+
+	c.MatchFinished(session.MatchResult{
+		Session:    &session.Session{ID: "s1"},
+		Activity:   &activity.Activity{Name: "Tischfußball"},
+		WinnerTeam: "A",
+		Teams: []session.Team{
+			{Label: "A", Members: []session.Participant{{DisplayName: "Anton"}}},
+			{Label: "B", Members: []session.Participant{{DisplayName: "Berta"}}},
+		},
+	})
+
+	select {
+	case body := <-bodies:
+		card := decode(t, body).Attachments[0].Content
+		// header + winner line + one line per team
+		if len(card.Body) != 4 {
+			t.Fatalf("expected header + winner + 2 team lines, got %d: %+v", len(card.Body), card.Body)
+		}
+		if !strings.Contains(card.Body[1].Text, "Anton") {
+			t.Errorf("winner line should name the winning team: %q", card.Body[1].Text)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no webhook request received")
+	}
+}
+
 // With no webhook configured the client must not call out (log-only mode) and
 // must never block or panic.
 func TestNoWebhookIsLogOnly(t *testing.T) {
@@ -107,7 +148,7 @@ func TestNoWebhookIsLogOnly(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := New("", "https://kicker.intranet", zap.NewNop())
+	c := New("", "https://kicker.intranet", testLocalizer(t), zap.NewNop())
 	c.SessionStarted(session.SessionStartedEvent{
 		Session:  &session.Session{ID: "s1"},
 		Activity: &activity.Activity{Name: "Tischfußball"},

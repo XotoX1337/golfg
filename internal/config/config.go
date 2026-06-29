@@ -20,7 +20,7 @@ const (
 	DisplayName = "go LFG"
 	Description = "GoLang Looking For Group Tool"
 	Author      = "Frederic Leist"
-	Version     = "v1.0.0"
+	Version     = "v1.0.1"
 )
 
 // ConfigFileName is the base name (without extension) of the runtime config file.
@@ -61,6 +61,10 @@ type AuthConfig struct {
 // TeamsConfig holds the Power-Automate webhook. Empty = posts are only logged.
 type TeamsConfig struct {
 	WebhookURL string `mapstructure:"webhook_url"`
+	// Lang is the language code (e.g. "en", "de") used for the channel
+	// notifications. The Teams channel has no per-request locale, so the
+	// language is fixed by config. Empty falls back to the i18n default.
+	Lang string `mapstructure:"lang"`
 }
 
 // BrandingConfig holds white-label UI settings so the public repo carries no
@@ -129,6 +133,7 @@ var envBindings = []struct {
 	{"auth.client_id", "GOLFG_AUTH_CLIENT_ID", ""},
 	{"auth.client_secret", "GOLFG_AUTH_CLIENT_SECRET", ""},
 	{"teams.webhook_url", "GOLFG_TEAMS_WEBHOOK_URL", ""},
+	{"teams.lang", "GOLFG_TEAMS_LANG", "en"},
 	{"session.expire_minutes", "GOLFG_SESSION_EXPIRE_MINUTES", 30},
 	{"session.cookie_secure", "GOLFG_SESSION_COOKIE_SECURE", false},
 }

@@ -19,11 +19,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/XotoX1337/golfg/internal/i18n"
 	"github.com/XotoX1337/golfg/internal/session"
 	"go.uber.org/zap"
 )
@@ -36,20 +36,28 @@ const postTimeout = 10 * time.Second
 type Client struct {
 	webhookURL string
 	baseURL    string // app base URL for deep-links, without trailing slash
+	loc        *i18n.Localizer
 	http       *http.Client
 	logger     *zap.Logger
 }
 
 // New builds a Teams client. An empty webhookURL puts the client in log-only
 // mode (graceful degradation). baseURL is used to build deep-links back into the
-// app.
-func New(webhookURL, baseURL string, logger *zap.Logger) *Client {
+// app. loc fixes the language of the channel notifications (the channel has no
+// per-request locale).
+func New(webhookURL, baseURL string, loc *i18n.Localizer, logger *zap.Logger) *Client {
 	return &Client{
 		webhookURL: strings.TrimSpace(webhookURL),
 		baseURL:    strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+		loc:        loc,
 		http:       &http.Client{Timeout: postTimeout},
 		logger:     logger,
 	}
+}
+
+// t translates a notification message ID in the client's configured language.
+func (c *Client) t(id string, pairs ...any) string {
+	return c.loc.T(id, pairs...)
 }
 
 // SessionStarted posts the "someone wants to play" announcement with a deep-link
@@ -59,43 +67,56 @@ func (c *Client) SessionStarted(e session.SessionStartedEvent) {
 	if name == "" {
 		name = "Someone"
 	}
-	title := fmt.Sprintf("⚽ %s wants to play %s", name, e.Activity.Name)
-	sub := fmt.Sprintf("%d spot(s) left — join in!", e.FreeSlots)
+	title := c.t("teams_notify_started_title", "Name", name, "Activity", e.Activity.Name)
+	sub := c.t("teams_notify_slots_left", "Count", e.FreeSlots)
 	if e.FreeSlots == 1 {
-		sub = "Last spot left — join in!"
+		sub = c.t("teams_notify_last_slot")
 	}
 	msg := c.card([]cardElement{
 		textBlock(title, "Large", "Bolder"),
 		textBlock(sub, "", ""),
-	}, "Join the game")
+	}, c.t("teams_notify_join_action"))
 	c.post("session started", title+" — "+sub, msg)
 }
 
 // TeamsDrawn posts the final line-up once the session is full.
 func (c *Client) TeamsDrawn(e session.TeamsDrawnEvent) {
-	body := []cardElement{textBlock("It's on! Teams are set ⚽", "Large", "Bolder")}
+	body := []cardElement{textBlock(c.t("teams_notify_drawn_title"), "Large", "Bolder")}
 	var summary []string
 	for _, t := range e.Teams {
-		names := make([]string, 0, len(t.Members))
-		for _, m := range t.Members {
-			names = append(names, displayName(m))
-		}
-		line := fmt.Sprintf("Team %s: %s", t.Label, strings.Join(names, ", "))
+		line := c.teamLine(t)
 		body = append(body, textBlock(line, "", "Bolder"))
 		summary = append(summary, line)
 	}
-	msg := c.card(body, "Open the app")
+	msg := c.card(body, c.t("teams_notify_open_action"))
 	c.post("teams drawn", strings.Join(summary, " — "), msg)
 }
 
-// MatchFinished is logged only: Teams posts are kept sparse (start + draw), and
-// the match result is already visible live in the app. This satisfies the
-// Notifier interface without fanning out a third post.
+// MatchFinished posts the result once a match is ended in the app: the winning
+// team (or a draw) plus the final line-ups for context.
 func (c *Client) MatchFinished(r session.MatchResult) {
-	c.logger.Info("match finished (teams: log only)",
-		zap.String("session", r.Session.ID),
-		zap.String("winner", r.WinnerTeam),
-	)
+	var title string
+	if r.WinnerTeam == "" {
+		title = c.t("teams_notify_finished_tie", "Activity", r.Activity.Name)
+	} else {
+		title = c.t("teams_notify_winner", "Team", session.TeamName(r.Teams, r.WinnerTeam), "Activity", r.Activity.Name)
+	}
+	body := []cardElement{textBlock(c.t("teams_notify_finished_title"), "Large", "Bolder"), textBlock(title, "", "Bolder")}
+	for _, t := range r.Teams {
+		body = append(body, textBlock(c.teamLine(t), "", ""))
+	}
+	msg := c.card(body, c.t("teams_notify_open_action"))
+	c.post("match finished", title, msg)
+}
+
+// teamLine renders an "Anton & Berta: Anton Müller, Berta Schmidt" summary line:
+// the team's display name followed by its members' full names.
+func (c *Client) teamLine(t session.Team) string {
+	names := make([]string, 0, len(t.Members))
+	for _, m := range t.Members {
+		names = append(names, displayName(m))
+	}
+	return c.t("teams_notify_team_line", "Name", t.Name(), "Names", strings.Join(names, ", "))
 }
 
 // post sends msg to the webhook in the background. With no webhook configured it

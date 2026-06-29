@@ -1,5 +1,5 @@
 {{ define "session-fragment" }}
-<div id="session" hx-get="/session" hx-trigger="every 3s" hx-target="this" hx-swap="outerHTML transition:true">
+<div id="session" hx-get="/session" hx-trigger="every 3s" hx-target="this" hx-ext="morph" hx-swap="morph">
 {{ with .Lobby }}
   {{ if .IsDrawn }}
   {{/* ---- Teams are drawn -------------------------------------------------- */}}
@@ -12,7 +12,7 @@
       {{ range $i, $team := .Teams }}
       {{ if $i }}<div class="vs" aria-hidden="true">{{ call $.T "versus" }}</div>{{ end }}
       <article class="team-card">
-        <header>{{ call $.T "team_label" "Label" $team.Label }}</header>
+        <header>{{ $team.Name }}</header>
         <ul>
           {{ range $team.Members }}
           <li>
