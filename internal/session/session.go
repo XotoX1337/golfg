@@ -64,6 +64,7 @@ type Participant struct {
 	DisplayName string
 	Email       string
 	Team        string // "" | "A" | "B" | ...
+	Elo         int    // current rating, used to seed the team-vs-team ELO update
 }
 
 // Team is a drawn team with its members, for display.
@@ -147,6 +148,7 @@ func (e HistoryEntry) Winner() string {
 // Stat is one player's tally across finished matches (a leaderboard row).
 type Stat struct {
 	DisplayName string
+	Elo         int
 	Played      int
 	Wins        int
 }

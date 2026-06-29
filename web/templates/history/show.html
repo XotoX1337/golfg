@@ -13,6 +13,7 @@
     <thead>
       <tr>
         <th scope="col">{{ call $.T "stats_player" }}</th>
+        <th scope="col">{{ call $.T "stats_rating" }}</th>
         <th scope="col">{{ call $.T "stats_played" }}</th>
         <th scope="col">{{ call $.T "stats_wins" }}</th>
       </tr>
@@ -21,6 +22,7 @@
       {{ range .Stats }}
       <tr>
         <td><i class="ri-user-fill"></i> {{ .DisplayName }}</td>
+        <td>{{ .Elo }}</td>
         <td>{{ .Played }}</td>
         <td>{{ .Wins }}</td>
       </tr>

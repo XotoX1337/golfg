@@ -242,7 +242,16 @@ func (m *Manager) Finish(sessionID, userID, winnerTeam string) error {
 		return ErrInvalidWinner
 	}
 
-	if err := m.repo.Finish(sessionID, winnerTeam); err != nil {
+	// Rate the match (forward-only) on the players' pre-match ratings, then apply
+	// the result and the deltas atomically. computeEloDeltas only handles the
+	// two-team shape the seeded activity produces; anything else is a deliberate
+	// no-op so the match still finishes cleanly.
+	eloDeltas := computeEloDeltas(teams, winnerTeam)
+	if eloDeltas == nil {
+		m.logger.Warn("skipping elo update: not a two-team match",
+			zap.String("session", sessionID), zap.Int("teams", len(teams)))
+	}
+	if err := m.repo.Finish(sessionID, winnerTeam, eloDeltas); err != nil {
 		return err
 	}
 	s.Status = StatusDone

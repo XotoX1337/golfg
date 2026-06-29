@@ -31,6 +31,7 @@ history_winner = "🏆 {{.Team}} hat gewonnen"
 back_to_lobby = "← Zurück zur Lobby"
 stats_title = "Bestenliste"
 stats_player = "Spieler"
+stats_rating = "Wertung"
 stats_played = "Gespielt"
 stats_wins = "Siege"
 

@@ -31,6 +31,7 @@ history_winner = "🏆 {{.Team}} won"
 back_to_lobby = "← Back to lobby"
 stats_title = "Leaderboard"
 stats_player = "Player"
+stats_rating = "Rating"
 stats_played = "Played"
 stats_wins = "Wins"
 
