@@ -148,6 +148,17 @@ channel"** using `triggerBody()?['attachments']` (the first attachment's
   (e.g. a dedicated bot), which is out of scope here.
 - **Notification language:** set `teams.lang` (`"en"`/`"de"`) to pick the channel
   language; it is independent of each user's in-app UI language.
+- **Custom "session started" headline:** set `branding.play_announcement`
+  (or `GOLFG_BRANDING_PLAY_ANNOUNCEMENT`) to override the *"… wants to play …"*
+  title line with your own wording. It is a small template with a single
+  `{{.Name}}` placeholder for the creator's name, e.g.
+  `play_announcement = "{{.Name}} will kickern!"` → *"Frederic Leist will
+  kickern!"*. The value is a **fixed literal** — it is not translated, so
+  `teams.lang` no longer affects this line (it still drives the "n spots left"
+  subtitle and the other cards). An empty value, or an invalid template, falls
+  back to the localized default (which also includes the activity name). The
+  matching in-app button label is `branding.play_cta`; see
+  `golfg.example.toml`.
 - **Outbound only / intranet hosting is fine:** the app just makes an outbound
   HTTPS POST to the workflow URL. Microsoft never calls back into the app, so the
   server does not need to be reachable from the internet.

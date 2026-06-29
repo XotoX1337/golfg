@@ -27,3 +27,5 @@ cookie_secure = false                # set true in production behind HTTPS (Secu
 [branding]                           # white-label the UI (no secrets — safe to commit)
 app_name = "go LFG"                  # shown in header, page title and footer
 accent_color = "#0f766e"             # any CSS color; drives buttons, header and highlights
+play_cta = ""                        # custom "I want to play" button label (fixed literal, not translated); empty = localized default
+play_announcement = ""               # custom Teams "session started" headline; text/template with {{.Name}}, e.g. "{{.Name}} will kickern!"; empty = localized default

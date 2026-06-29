@@ -87,7 +87,7 @@
       <p>{{ call $.T "empty_subtitle" }}</p>
     </hgroup>
     <form method="post" action="/session/start" hx-post="/session/start" hx-target="#session" hx-swap="outerHTML transition:true">
-      <button type="submit" class="cta">{{ call $.T "session_start" }}</button>
+      <button type="submit" class="cta">{{ with PlayCTA }}{{ . }}{{ else }}{{ call $.T "session_start" }}{{ end }}</button>
     </form>
   </article>
   {{ end }}

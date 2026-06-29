@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/XotoX1337/golfg/internal/i18n"
@@ -34,24 +35,37 @@ const postTimeout = 10 * time.Second
 // Client posts Adaptive Cards to a Power-Automate workflow webhook. The zero
 // value is not usable; build one with New.
 type Client struct {
-	webhookURL string
-	baseURL    string // app base URL for deep-links, without trailing slash
-	loc        *i18n.Localizer
-	http       *http.Client
-	logger     *zap.Logger
+	webhookURL  string
+	baseURL     string // app base URL for deep-links, without trailing slash
+	loc         *i18n.Localizer
+	startedTmpl *template.Template // optional custom "session started" headline
+	http        *http.Client
+	logger      *zap.Logger
 }
 
 // New builds a Teams client. An empty webhookURL puts the client in log-only
 // mode (graceful degradation). baseURL is used to build deep-links back into the
 // app. loc fixes the language of the channel notifications (the channel has no
-// per-request locale).
-func New(webhookURL, baseURL string, loc *i18n.Localizer, logger *zap.Logger) *Client {
+// per-request locale). playAnnouncement, when non-empty, is a text/template with
+// a single {{.Name}} placeholder that overrides the localized "session started"
+// headline; an invalid template is logged and ignored (the default is used).
+func New(webhookURL, baseURL, playAnnouncement string, loc *i18n.Localizer, logger *zap.Logger) *Client {
+	var startedTmpl *template.Template
+	if s := strings.TrimSpace(playAnnouncement); s != "" {
+		t, err := template.New("play_announcement").Parse(s)
+		if err != nil {
+			logger.Warn("teams: invalid branding.play_announcement template, using localized default", zap.Error(err))
+		} else {
+			startedTmpl = t
+		}
+	}
 	return &Client{
-		webhookURL: strings.TrimSpace(webhookURL),
-		baseURL:    strings.TrimRight(strings.TrimSpace(baseURL), "/"),
-		loc:        loc,
-		http:       &http.Client{Timeout: postTimeout},
-		logger:     logger,
+		webhookURL:  strings.TrimSpace(webhookURL),
+		baseURL:     strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+		loc:         loc,
+		startedTmpl: startedTmpl,
+		http:        &http.Client{Timeout: postTimeout},
+		logger:      logger,
 	}
 }
 
@@ -67,7 +81,7 @@ func (c *Client) SessionStarted(e session.SessionStartedEvent) {
 	if name == "" {
 		name = "Someone"
 	}
-	title := c.t("teams_notify_started_title", "Name", name, "Activity", e.Activity.Name)
+	title := c.startedTitle(name, e.Activity.Name)
 	sub := c.t("teams_notify_slots_left", "Count", e.FreeSlots)
 	if e.FreeSlots == 1 {
 		sub = c.t("teams_notify_last_slot")
@@ -77,6 +91,26 @@ func (c *Client) SessionStarted(e session.SessionStartedEvent) {
 		textBlock(sub, "", ""),
 	}, c.t("teams_notify_join_action"))
 	c.post("session started", title+" — "+sub, msg)
+}
+
+// startedTitle renders the "session started" headline. With a configured
+// branding.play_announcement it renders that fixed template against the creator's
+// {{.Name}} (text/template, so the value is substituted as plain text). Without
+// one — or if rendering fails — it falls back to the localized default, which
+// also carries the activity name.
+func (c *Client) startedTitle(name, activity string) string {
+	fallback := func() string {
+		return c.t("teams_notify_started_title", "Name", name, "Activity", activity)
+	}
+	if c.startedTmpl == nil {
+		return fallback()
+	}
+	var buf bytes.Buffer
+	if err := c.startedTmpl.Execute(&buf, map[string]string{"Name": name}); err != nil {
+		c.logger.Warn("teams: render branding.play_announcement failed, using localized default", zap.Error(err))
+		return fallback()
+	}
+	return buf.String()
 }
 
 // TeamsDrawn posts the final line-up once the session is full.

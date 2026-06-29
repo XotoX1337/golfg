@@ -50,7 +50,7 @@ func decode(t *testing.T, body []byte) adaptiveMessage {
 
 func TestSessionStartedPostsCard(t *testing.T) {
 	srv, bodies := captureServer(t)
-	c := New(srv.URL, "https://kicker.intranet/", testLocalizer(t), zap.NewNop())
+	c := New(srv.URL, "https://kicker.intranet/", "", testLocalizer(t), zap.NewNop())
 
 	c.SessionStarted(session.SessionStartedEvent{
 		Session:   &session.Session{ID: "s1"},
@@ -84,7 +84,7 @@ func TestSessionStartedPostsCard(t *testing.T) {
 
 func TestTeamsDrawnListsBothTeams(t *testing.T) {
 	srv, bodies := captureServer(t)
-	c := New(srv.URL, "https://kicker.intranet", testLocalizer(t), zap.NewNop())
+	c := New(srv.URL, "https://kicker.intranet", "", testLocalizer(t), zap.NewNop())
 
 	c.TeamsDrawn(session.TeamsDrawnEvent{
 		Session:  &session.Session{ID: "s1"},
@@ -112,7 +112,7 @@ func TestTeamsDrawnListsBothTeams(t *testing.T) {
 
 func TestMatchFinishedPostsWinner(t *testing.T) {
 	srv, bodies := captureServer(t)
-	c := New(srv.URL, "https://kicker.intranet", testLocalizer(t), zap.NewNop())
+	c := New(srv.URL, "https://kicker.intranet", "", testLocalizer(t), zap.NewNop())
 
 	c.MatchFinished(session.MatchResult{
 		Session:    &session.Session{ID: "s1"},
@@ -148,7 +148,7 @@ func TestNoWebhookIsLogOnly(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := New("", "https://kicker.intranet", testLocalizer(t), zap.NewNop())
+	c := New("", "https://kicker.intranet", "", testLocalizer(t), zap.NewNop())
 	c.SessionStarted(session.SessionStartedEvent{
 		Session:  &session.Session{ID: "s1"},
 		Activity: &activity.Activity{Name: "Tischfußball"},
@@ -157,5 +157,56 @@ func TestNoWebhookIsLogOnly(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	if called {
 		t.Fatal("log-only client must not make HTTP calls")
+	}
+}
+
+// A configured play_announcement overrides the localized headline, substituting
+// the creator's {{.Name}}; the subtitle ("n spots left") stays untouched.
+func TestPlayAnnouncementOverridesTitle(t *testing.T) {
+	srv, bodies := captureServer(t)
+	c := New(srv.URL, "https://kicker.intranet", "{{.Name}} will kickern!", testLocalizer(t), zap.NewNop())
+
+	c.SessionStarted(session.SessionStartedEvent{
+		Session:   &session.Session{ID: "s1"},
+		Activity:  &activity.Activity{Name: "Tischfußball"},
+		Creator:   session.Participant{DisplayName: "Frederic Leist"},
+		FreeSlots: 3,
+	})
+
+	select {
+	case body := <-bodies:
+		card := decode(t, body).Attachments[0].Content
+		if got := card.Body[0].Text; got != "Frederic Leist will kickern!" {
+			t.Errorf("custom title: got %q", got)
+		}
+		if !strings.Contains(card.Body[1].Text, "3") {
+			t.Errorf("subtitle should still report free slots: %q", card.Body[1].Text)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no webhook request received")
+	}
+}
+
+// An invalid template must not crash; the client falls back to the localized
+// default headline (which carries the activity name).
+func TestPlayAnnouncementInvalidFallsBack(t *testing.T) {
+	srv, bodies := captureServer(t)
+	c := New(srv.URL, "https://kicker.intranet", "{{.Name", testLocalizer(t), zap.NewNop())
+
+	c.SessionStarted(session.SessionStartedEvent{
+		Session:   &session.Session{ID: "s1"},
+		Activity:  &activity.Activity{Name: "Tischfußball"},
+		Creator:   session.Participant{DisplayName: "Anton"},
+		FreeSlots: 3,
+	})
+
+	select {
+	case body := <-bodies:
+		card := decode(t, body).Attachments[0].Content
+		if !strings.Contains(card.Body[0].Text, "Tischfußball") {
+			t.Errorf("expected localized default headline with activity, got %q", card.Body[0].Text)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no webhook request received")
 	}
 }

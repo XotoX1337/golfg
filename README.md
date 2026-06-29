@@ -23,8 +23,8 @@ configured (graceful degradation: Teams posts are just logged, auth is optional 
 can be tried out standalone.
 
 The UI is mobile-first, **light/dark**, available in **English and German** (auto-detected, with a
-switcher), and **white-label** — app name and accent color are configurable so anyone can re-brand
-it.
+switcher), and **white-label** — app name, accent color and the "I want to play" wording (button
+label and Teams headline) are configurable so anyone can re-brand it.
 
 ## Tech stack
 
@@ -70,6 +70,8 @@ base_url = "https://kicker.intranet"   # for Teams deep links
 [branding]        # white-label the public app (no secrets)
 app_name = ""                            # empty = "go LFG"
 accent_color = ""                        # any CSS color; empty = default teal
+play_cta = ""                            # custom "I want to play" button label; empty = localized default
+play_announcement = ""                   # custom Teams headline, template with {{.Name}}; empty = localized default
 
 [auth]            # leave empty = dev mode without SSO
 tenant_id = ""
@@ -78,6 +80,7 @@ client_secret = ""                       # prefer ENV: GOLFG_AUTH_CLIENT_SECRET
 
 [teams]           # leave empty = posts are only logged
 webhook_url = ""                         # prefer ENV: GOLFG_TEAMS_WEBHOOK_URL
+lang = "en"                              # channel notification language: "en" or "de"
 
 [session]
 expire_minutes = 30                      # 0 = never auto-expire
