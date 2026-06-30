@@ -20,7 +20,7 @@ const (
 	DisplayName = "go LFG"
 	Description = "GoLang Looking For Group Tool"
 	Author      = "Frederic Leist"
-	Version     = "v1.0.1"
+	Version     = "v1.1.0"
 )
 
 // ConfigFileName is the base name (without extension) of the runtime config file.
