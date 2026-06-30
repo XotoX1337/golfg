@@ -2,6 +2,7 @@
 package server
 
 import (
+	"errors"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/XotoX1337/golfg/internal/session"
 	"github.com/XotoX1337/golfg/internal/store"
 	"github.com/XotoX1337/golfg/internal/teams"
+	"github.com/XotoX1337/golfg/internal/user"
 	"github.com/XotoX1337/golfg/web"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
@@ -29,6 +31,7 @@ type Server struct {
 	logger   *zap.Logger
 	auth     *auth.Manager
 	sessions *session.Manager
+	users    *user.Repository
 	i18n     *i18n.Bundle
 
 	reaperStop chan struct{} // closed on Shutdown to stop the expiry reaper
@@ -59,6 +62,7 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 	engine := html.NewFileSystem(http.FS(tmplFS), ".html")
 	engine.AddFunc("Name", cfg.AppName)
 	engine.AddFunc("Accent", cfg.AccentColor)
+	engine.AddFunc("PlayCTA", cfg.PlayCTA)
 	engine.AddFunc("Initials", initials)
 	engine.AddFunc("OpenSlots", openSlots)
 	engine.AddFunc("Version", func() string { return config.Version })
@@ -69,6 +73,7 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 		}
 		return t.Local().Format("2006-01-02 15:04")
 	})
+	engine.AddFunc("dict", dict)
 
 	app := fiber.New(fiber.Config{
 		AppName: cfg.AppName(),
@@ -83,10 +88,10 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 	// Teams notifier: posts session events to the configured webhook, or logs
 	// them when none is set (graceful degradation). The channel has no
 	// per-request locale, so its language is fixed by config.
-	notifier := teams.New(cfg.Teams.WebhookURL, cfg.App.BaseURL, bundle.Localizer(cfg.Teams.Lang), logger)
+	notifier := teams.New(cfg.Teams.WebhookURL, cfg.App.BaseURL, cfg.PlayAnnouncement(), cfg.Teams.MentionPlayers, bundle.Localizer(cfg.Teams.Lang), logger)
 	sessionMgr := session.New(st, logger, cfg.Session.ExpireMinutes, session.WithNotifier(notifier))
 
-	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr, sessions: sessionMgr, i18n: bundle}
+	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr, sessions: sessionMgr, users: user.NewRepository(st), i18n: bundle}
 	s.routes(staticFS)
 	if cfg.Session.ExpireMinutes > 0 {
 		s.startReaper()
@@ -146,6 +151,24 @@ func initials(name string) string {
 	}
 }
 
+// dict builds a map from alternating key/value template arguments, so a partial
+// can be handed several named values at once (e.g. a translator plus a data
+// slice) — Go templates pass a single pipeline value to {{ template }}.
+func dict(pairs ...any) (map[string]any, error) {
+	if len(pairs)%2 != 0 {
+		return nil, errors.New("dict: needs an even number of arguments")
+	}
+	m := make(map[string]any, len(pairs)/2)
+	for i := 0; i < len(pairs); i += 2 {
+		key, ok := pairs[i].(string)
+		if !ok {
+			return nil, errors.New("dict: keys must be strings")
+		}
+		m[key] = pairs[i+1]
+	}
+	return m, nil
+}
+
 // openSlots returns a slice sized to the number of still-open player slots, so
 // templates can render placeholder rows (range over it) and keep the lobby
 // layout stable as players join.
@@ -178,6 +201,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.app.Get("/session/finish", s.auth.RequireAuth, s.showFinishModal)
 	s.app.Post("/session/finish", s.auth.RequireAuth, s.finishSession)
 	s.app.Get("/history", s.auth.RequireAuth, s.showHistory)
+	s.app.Get("/avatar/:userID", s.auth.RequireAuth, s.showAvatar)
 
 	// Serve embedded static assets as a catch-all (must be registered last).
 	s.app.Use("/", filesystem.New(filesystem.Config{

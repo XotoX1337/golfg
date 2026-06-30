@@ -76,9 +76,33 @@ go LFG requests the standard OpenID Connect scopes `openid`, `profile` and
    Delegated permissions**.
 2. Add `openid`, `profile`, `email` and click **Add permissions**.
 
-These are low-privilege, user-consentable permissions (just sign-in and basic
-profile), so admin consent is normally not required. The app reads the user's
-object id (`oid`), name and email from the ID token only — it does not call Graph.
+The app reads the user's object id (`oid`), name and email from the ID token.
+
+### Profile photos (delegated `User.Read`)
+
+By default go LFG also shows each user's **Microsoft 365 profile photo** in the
+header, leaderboard and team lists. To read it, the login additionally requests
+the delegated permission **`User.Read`**:
+
+1. **API permissions → + Add a permission → Microsoft Graph →
+   Delegated permissions**.
+2. Add `User.Read` and click **Add permissions**.
+
+`User.Read` is **user-consentable** — no admin consent is required (a one-time
+consent prompt may appear at the first login with this scope; that's expected).
+Each user pulls **only their own** photo via `GET /me/photo` during their login;
+the app never reads other users' photos (which would need `User.ReadBasic.All`
+and admin consent). The image is then **cached in the local database** and served
+to signed-in users from an internal `/avatar` route. A user without a photo (and
+every dev-mode login) simply keeps the initials badge.
+
+If you'd rather **not** fetch photos at all — keeping logins to the bare
+`openid`/`profile`/`email` scopes and never calling Graph — set
+`auth.fetch_photos = false` (or `GOLFG_AUTH_FETCH_PHOTOS=false`). When disabled,
+`User.Read` is not requested.
+
+These are all low-privilege, user-consentable permissions (sign-in, basic
+profile, and the user's own photo), so admin consent is normally not required.
 
 ## 5. Put the values into go LFG's config
 

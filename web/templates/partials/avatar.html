@@ -1,0 +1,24 @@
+{{/*
+  Reusable round avatar. Shows the user's cached M365 photo when one exists,
+  otherwise the initials badge (the long-standing fallback). Expects a dict:
+    .ID       — user id, used for the /avatar/:id photo URL
+    .Name     — display name, for the initials fallback and alt text
+    .HasPhoto — whether a cached photo exists
+    .Class    — optional extra CSS class(es) on the avatar (e.g. "avatar-sm")
+  Render with:
+    {{ template "avatar" (dict "ID" .UserID "Name" .DisplayName "HasPhoto" .HasPhoto "Class" "avatar-sm") }}
+
+  When HasPhoto is set the <img> is layered over the initials: if it loads it
+  covers them, and if it ever fails (revoked photo, 404) onerror drops the <img>
+  and the initials show through — so there is never a broken image.
+*/}}
+{{ define "avatar" }}
+{{ if .HasPhoto }}
+<span class="avatar avatar-photo{{ with .Class }} {{ . }}{{ end }}" aria-hidden="true">
+  <span class="avatar-initials">{{ Initials .Name }}</span>
+  <img class="avatar-img" src="/avatar/{{ .ID }}" alt="" loading="lazy" onerror="this.remove()"/>
+</span>
+{{ else }}
+<span class="avatar{{ with .Class }} {{ . }}{{ end }}" aria-hidden="true">{{ Initials .Name }}</span>
+{{ end }}
+{{ end }}

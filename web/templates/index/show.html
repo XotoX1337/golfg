@@ -5,4 +5,9 @@
 </hgroup>
 {{ template "session-fragment" . }}
 <div id="modal"></div>
+{{/* Top players sit outside #session, so the 3s poll never reloads them.
+     Omitted entirely until at least one match has finished. */}}
+{{ if .Leaderboard }}
+{{ template "leaderboard" (dict "T" .T "Title" "top_players_title" "Stats" .Leaderboard) }}
+{{ end }}
 {{ template "footer" . }}

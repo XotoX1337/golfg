@@ -56,6 +56,11 @@ type AuthConfig struct {
 	TenantID     string `mapstructure:"tenant_id"`
 	ClientID     string `mapstructure:"client_id"`
 	ClientSecret string `mapstructure:"client_secret"`
+	// FetchPhotos, when true (default), requests the delegated Graph permission
+	// User.Read at login and best-effort caches the user's own M365 profile photo
+	// for display. Set false to keep logins to the bare OIDC scopes and never call
+	// Graph. No effect in dev mode (no Graph token). Default true.
+	FetchPhotos bool `mapstructure:"fetch_photos"`
 }
 
 // TeamsConfig holds the Power-Automate webhook. Empty = posts are only logged.
@@ -65,16 +70,30 @@ type TeamsConfig struct {
 	// notifications. The Teams channel has no per-request locale, so the
 	// language is fixed by config. Empty falls back to the i18n default.
 	Lang string `mapstructure:"lang"`
+	// MentionPlayers, when true, @-mentions the drawn players in the "teams are
+	// set" post so they get a real Teams notification. Only members with an
+	// Entra object id (SSO login) can be mentioned; dev-login users render as a
+	// plain name. Default true. Disable with mention_players = false.
+	MentionPlayers bool `mapstructure:"mention_players"`
 }
 
 // BrandingConfig holds white-label UI settings so the public repo carries no
-// firm-specific name or color. Both are safe to expose (no secrets).
+// firm-specific name or color. All values are safe to expose (no secrets).
 type BrandingConfig struct {
 	// AppName is shown in the header, page title and footer. Empty = DisplayName.
 	AppName string `mapstructure:"app_name"`
 	// AccentColor is any CSS color (hex recommended). It drives every accent
 	// surface; hover/focus shades are derived from it in CSS. Empty = default.
 	AccentColor string `mapstructure:"accent_color"`
+	// PlayCTA overrides the "I want to play" button label with a fixed literal
+	// (e.g. "⚽ Ich will kickern"). It is NOT translated — same trade-off as
+	// AppName. Empty = the localized session_start string.
+	PlayCTA string `mapstructure:"play_cta"`
+	// PlayAnnouncement overrides the Teams "session started" headline. It is a
+	// text/template with a single {{.Name}} placeholder (the creator's name),
+	// e.g. "{{.Name}} will kickern!". It is NOT translated. Empty = the localized
+	// teams_notify_started_title (which also carries the activity name).
+	PlayAnnouncement string `mapstructure:"play_announcement"`
 }
 
 type SessionConfig struct {
@@ -112,6 +131,18 @@ func (c *Config) AccentColor() string {
 	return DefaultAccentColor
 }
 
+// PlayCTA returns the configured custom "I want to play" button label, or "" to
+// signal the caller should fall back to the localized session_start string.
+func (c *Config) PlayCTA() string {
+	return c.Branding.PlayCTA
+}
+
+// PlayAnnouncement returns the configured custom Teams "session started" title
+// template ({{.Name}} placeholder), or "" to fall back to the localized default.
+func (c *Config) PlayAnnouncement() string {
+	return c.Branding.PlayAnnouncement
+}
+
 // Addr returns the host:port the server should bind to.
 func (c *Config) Addr() string {
 	return fmt.Sprintf("%s:%d", c.App.Host, c.App.Port)
@@ -129,11 +160,15 @@ var envBindings = []struct {
 	{"app.base_url", "GOLFG_APP_BASE_URL", "http://localhost:9000"},
 	{"branding.app_name", "GOLFG_BRANDING_APP_NAME", DisplayName},
 	{"branding.accent_color", "GOLFG_BRANDING_ACCENT_COLOR", DefaultAccentColor},
+	{"branding.play_cta", "GOLFG_BRANDING_PLAY_CTA", ""},
+	{"branding.play_announcement", "GOLFG_BRANDING_PLAY_ANNOUNCEMENT", ""},
 	{"auth.tenant_id", "GOLFG_AUTH_TENANT_ID", ""},
 	{"auth.client_id", "GOLFG_AUTH_CLIENT_ID", ""},
 	{"auth.client_secret", "GOLFG_AUTH_CLIENT_SECRET", ""},
+	{"auth.fetch_photos", "GOLFG_AUTH_FETCH_PHOTOS", true},
 	{"teams.webhook_url", "GOLFG_TEAMS_WEBHOOK_URL", ""},
 	{"teams.lang", "GOLFG_TEAMS_LANG", "en"},
+	{"teams.mention_players", "GOLFG_TEAMS_MENTION_PLAYERS", true},
 	{"session.expire_minutes", "GOLFG_SESSION_EXPIRE_MINUTES", 30},
 	{"session.cookie_secure", "GOLFG_SESSION_COOKIE_SECURE", false},
 }

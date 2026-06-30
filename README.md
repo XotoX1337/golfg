@@ -23,8 +23,8 @@ configured (graceful degradation: Teams posts are just logged, auth is optional 
 can be tried out standalone.
 
 The UI is mobile-first, **light/dark**, available in **English and German** (auto-detected, with a
-switcher), and **white-label** — app name and accent color are configurable so anyone can re-brand
-it.
+switcher), and **white-label** — app name, accent color and the "I want to play" wording (button
+label and Teams headline) are configurable so anyone can re-brand it.
 
 ## Tech stack
 
@@ -70,6 +70,8 @@ base_url = "https://kicker.intranet"   # for Teams deep links
 [branding]        # white-label the public app (no secrets)
 app_name = ""                            # empty = "go LFG"
 accent_color = ""                        # any CSS color; empty = default teal
+play_cta = ""                            # custom "I want to play" button label; empty = localized default
+play_announcement = ""                   # custom Teams "session started" headline; Go text/template, {{.Name}} = creator, e.g. "{{.Name}} wants to play!"; empty = localized default
 
 [auth]            # leave empty = dev mode without SSO
 tenant_id = ""
@@ -78,6 +80,7 @@ client_secret = ""                       # prefer ENV: GOLFG_AUTH_CLIENT_SECRET
 
 [teams]           # leave empty = posts are only logged
 webhook_url = ""                         # prefer ENV: GOLFG_TEAMS_WEBHOOK_URL
+lang = "en"                              # channel notification language: "en" or "de"
 
 [session]
 expire_minutes = 30                      # 0 = never auto-expire
@@ -92,7 +95,7 @@ The binary keeps its config, log and database files (`golfg.toml`, `golfg.log`, 
 `golfg` is the **project name** (Go + LFG) — it's only the repo, module path and `GOLFG_*` config
 prefix. The running app shows whatever you set as `[branding].app_name`, and in day-to-day use it's
 really called after the host it lives on. Point it at `kicker.intra.net`, set `app_name = "Kicker"`,
-and "hey, lass kickern!" is all your colleagues need — no global product name required. White-label
+and "hey, let's play!" is all your colleagues need — no global product name required. White-label
 it freely.
 
 ## Deployment

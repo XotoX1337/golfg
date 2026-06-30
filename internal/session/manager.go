@@ -242,7 +242,16 @@ func (m *Manager) Finish(sessionID, userID, winnerTeam string) error {
 		return ErrInvalidWinner
 	}
 
-	if err := m.repo.Finish(sessionID, winnerTeam); err != nil {
+	// Rate the match (forward-only) on the players' pre-match ratings, then apply
+	// the result and the deltas atomically. computeEloDeltas only handles the
+	// two-team shape the seeded activity produces; anything else is a deliberate
+	// no-op so the match still finishes cleanly.
+	eloDeltas := computeEloDeltas(teams, winnerTeam)
+	if eloDeltas == nil {
+		m.logger.Warn("skipping elo update: not a two-team match",
+			zap.String("session", sessionID), zap.Int("teams", len(teams)))
+	}
+	if err := m.repo.Finish(sessionID, winnerTeam, eloDeltas); err != nil {
 		return err
 	}
 	s.Status = StatusDone
@@ -369,6 +378,16 @@ func (m *Manager) History(limit int) (*History, error) {
 		return nil, err
 	}
 	return h, nil
+}
+
+// TopPlayers returns the leaderboard's highest-ranked players, capped at limit,
+// ranked exactly like the history page's full leaderboard. The home page shows
+// this as a compact top-N below the lobby.
+func (m *Manager) TopPlayers(limit int) ([]Stat, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.repo.TopPlayers(limit)
 }
 
 // validTeam reports whether label matches one of the drawn teams.

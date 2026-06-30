@@ -16,7 +16,7 @@
         <ul>
           {{ range $team.Members }}
           <li>
-            <span class="avatar" aria-hidden="true">{{ Initials .DisplayName }}</span>
+            {{ template "avatar" (dict "ID" .UserID "Name" .DisplayName "HasPhoto" .HasPhoto) }}
             <span class="name">{{ .DisplayName }}</span>
           </li>
           {{ end }}
@@ -53,7 +53,7 @@
     <ul class="participants">
       {{ range .Participants }}
       <li>
-        <span class="avatar" aria-hidden="true">{{ Initials .DisplayName }}</span>
+        {{ template "avatar" (dict "ID" .UserID "Name" .DisplayName "HasPhoto" .HasPhoto) }}
         <span class="name">{{ .DisplayName }}</span>
         {{ if eq .UserID $creator }}<span class="host-badge">{{ call $.T "lobby_host" }}</span>{{ end }}
       </li>
@@ -87,7 +87,7 @@
       <p>{{ call $.T "empty_subtitle" }}</p>
     </hgroup>
     <form method="post" action="/session/start" hx-post="/session/start" hx-target="#session" hx-swap="outerHTML transition:true">
-      <button type="submit" class="cta">{{ call $.T "session_start" }}</button>
+      <button type="submit" class="cta">{{ with PlayCTA }}{{ . }}{{ else }}{{ call $.T "session_start" }}{{ end }}</button>
     </form>
   </article>
   {{ end }}

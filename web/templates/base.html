@@ -52,7 +52,7 @@
                 </li>
                 {{ if .CurrentUser }}
                 <li class="current-user">
-                    <span class="avatar avatar-sm" aria-hidden="true">{{ Initials .CurrentUser.DisplayName }}</span>
+                    {{ template "avatar" (dict "ID" .CurrentUser.ID "Name" .CurrentUser.DisplayName "HasPhoto" .CurrentUser.HasPhoto "Class" "avatar-sm") }}
                     <span class="current-user-name">{{ .CurrentUser.DisplayName }}</span>
                 </li>
                 <li><a href="/history" role="button" class="secondary outline" title="{{ call .T "nav_history" }}"><i class="ri-history-line"></i> <span class="label-md">{{ call .T "nav_history" }}</span></a></li>

@@ -74,20 +74,37 @@ func (r *Repository) CountFinished() (int, error) {
 	return n, err
 }
 
-// Leaderboard tallies each player's finished matches and wins (their team equals
-// the session's winning team), ordered by wins then matches played. One small
-// grouped query — the history page is read-rarely and the data set is tiny.
+// Leaderboard tallies every player's finished matches and wins, ranked best
+// first. See leaderboard for the ranking criteria.
 func (r *Repository) Leaderboard() ([]Stat, error) {
+	return r.leaderboard(-1)
+}
+
+// TopPlayers returns the highest-ranked players, capped at limit, using the same
+// ranking as Leaderboard (a limit of -1 means no cap).
+func (r *Repository) TopPlayers(limit int) ([]Stat, error) {
+	return r.leaderboard(limit)
+}
+
+// leaderboard tallies each player's finished matches and wins (their team equals
+// the session's winning team), ranked by ELO rating (the primary criterion),
+// then wins and matches played, capped at limit (-1 = all). One small grouped
+// query — the leaderboard is read-rarely and the data set is tiny.
+func (r *Repository) leaderboard(limit int) ([]Stat, error) {
 	rows, err := r.db.Query(`
-		SELECT u.display_name,
+		SELECT u.id,
+		       u.display_name,
+		       u.elo,
 		       COUNT(*) AS played,
-		       COALESCE(SUM(CASE WHEN p.team = s.winner_team THEN 1 ELSE 0 END), 0) AS wins
+		       COALESCE(SUM(CASE WHEN p.team = s.winner_team THEN 1 ELSE 0 END), 0) AS wins,
+		       EXISTS(SELECT 1 FROM user_photos up WHERE up.user_id = u.id) AS has_photo
 		FROM participations p
 		JOIN sessions s ON s.id = p.session_id
 		JOIN users u ON u.id = p.user_id
 		WHERE s.status = 'DONE'
 		GROUP BY p.user_id
-		ORDER BY wins DESC, played DESC, u.display_name`)
+		ORDER BY u.elo DESC, wins DESC, played DESC, u.display_name
+		LIMIT ?`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("leaderboard: %w", err)
 	}
@@ -96,7 +113,7 @@ func (r *Repository) Leaderboard() ([]Stat, error) {
 	var out []Stat
 	for rows.Next() {
 		var st Stat
-		if err := rows.Scan(&st.DisplayName, &st.Played, &st.Wins); err != nil {
+		if err := rows.Scan(&st.UserID, &st.DisplayName, &st.Elo, &st.Played, &st.Wins, &st.HasPhoto); err != nil {
 			return nil, err
 		}
 		out = append(out, st)
@@ -196,7 +213,8 @@ func (r *Repository) CountParticipants(sessionID string) (int, error) {
 // ordered by join time.
 func (r *Repository) Participants(sessionID string) ([]Participant, error) {
 	rows, err := r.db.Query(`
-		SELECT p.user_id, COALESCE(u.display_name, ''), COALESCE(u.email, ''), COALESCE(p.team, '')
+		SELECT p.user_id, COALESCE(u.display_name, ''), COALESCE(u.email, ''), COALESCE(u.entra_oid, ''), COALESCE(p.team, ''), u.elo,
+		       EXISTS(SELECT 1 FROM user_photos up WHERE up.user_id = u.id)
 		FROM participations p
 		JOIN users u ON u.id = p.user_id
 		WHERE p.session_id = ?
@@ -209,7 +227,7 @@ func (r *Repository) Participants(sessionID string) ([]Participant, error) {
 	var out []Participant
 	for rows.Next() {
 		var p Participant
-		if err := rows.Scan(&p.UserID, &p.DisplayName, &p.Email, &p.Team); err != nil {
+		if err := rows.Scan(&p.UserID, &p.DisplayName, &p.Email, &p.EntraOID, &p.Team, &p.Elo, &p.HasPhoto); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
@@ -245,16 +263,32 @@ func (r *Repository) ApplyDraw(sessionID string, teams [][]string) error {
 	return tx.Commit()
 }
 
-// Finish records the winning team and closes the session as DONE, atomically.
-func (r *Repository) Finish(sessionID, winnerTeam string) error {
-	_, err := r.db.Exec(
+// Finish records the winning team, closes the session as DONE and applies the
+// per-player ELO deltas — all in one transaction, so the rating update never
+// drifts out of step with the match result. eloDeltas maps each participant's
+// user id to the rating change to add; a nil/empty map records the result
+// without touching any rating.
+func (r *Repository) Finish(sessionID, winnerTeam string, eloDeltas map[string]int) error {
+	tx, err := r.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op after a successful Commit
+
+	if _, err := tx.Exec(
 		`UPDATE sessions SET winner_team = ?, status = ? WHERE id = ?`,
 		winnerTeam, string(StatusDone), sessionID,
-	)
-	if err != nil {
+	); err != nil {
 		return fmt.Errorf("finish session: %w", err)
 	}
-	return nil
+	for userID, delta := range eloDeltas {
+		if _, err := tx.Exec(
+			`UPDATE users SET elo = elo + ? WHERE id = ?`, delta, userID,
+		); err != nil {
+			return fmt.Errorf("apply elo to %s: %w", userID, err)
+		}
+	}
+	return tx.Commit()
 }
 
 // scanOne runs a single-row session query, returning nil (no error) for no row.

@@ -71,6 +71,7 @@ base_url = "https://kicker.intranet"   # used for the deep-link button in cards
 [teams]
 webhook_url = ""                        # leave empty here; inject via ENV
 lang = "en"                             # channel notification language: "en" or "de"
+mention_players = true                  # @-mention drawn players in the "teams are set" post (set false to disable)
 ```
 
 Then provide the secret URL via environment variable when starting the app:
@@ -101,6 +102,44 @@ If nothing appears, check the app log: a successful send logs
 `teams post sent` with HTTP status `200`/`202`; failures log `teams: post failed`
 or `teams: unexpected status`. Posts are best-effort and asynchronous, so a
 broken webhook never blocks or crashes the app.
+
+## 5. Auto-delete old messages (retention policy)
+
+go LFG's posts are throwaway by design — once a session is over, its cards have
+served their purpose. To keep the **Kickern** channel from growing forever you can
+have Microsoft delete messages automatically after a chosen age. This is a
+**Microsoft 365 / Purview** feature, configured by an admin outside go LFG; the
+app itself has no say in it.
+
+> **Permissions:** you need a role that can manage retention in the
+> [Microsoft Purview portal](https://purview.microsoft.com) (e.g. *Compliance
+> Administrator* or *Global Administrator*). Retention policies can take **up to
+> ~7 days** to take effect, and deletion is **permanent** — there is no per-message
+> opt-out once the policy applies, so scope it to just the right channel.
+
+1. Go to the [Microsoft Purview portal](https://purview.microsoft.com) →
+   **Data Lifecycle Management** → **Policies → Retention policies** →
+   **New retention policy**.
+2. Give it a name, e.g. *"Kickern channel cleanup"*.
+3. For the retention setting, choose **Retain items for a specific period** (or
+   skip retention entirely) and then **delete items automatically** after your
+   chosen age — e.g. **30 days** — counted from when each message was created.
+4. For the **scope (locations)**, this matters:
+   - Standard channel messages live in the **Teams channel messages** location.
+     Selecting it applies to the team, and you narrow it to the specific team
+     (the one holding **Kickern**). Note that a *standard* channel's messages
+     can't always be scoped to a single channel — the policy applies at the team
+     level — so put **Kickern** in a team where team-wide message retention is
+     acceptable, or use a **private/shared channel** (which has its own
+     location: **Teams private/shared channel messages**) if you need
+     channel-level granularity.
+5. Review and **submit**. Existing messages older than the threshold start being
+   removed on the next cleanup cycle; new ones age out continuously thereafter.
+
+This is purely a housekeeping convenience and is **independent of go LFG** —
+the app keeps posting; Microsoft just prunes the channel on the schedule you set.
+Deleting an old card in the channel never affects sessions or data in go LFG (the
+app's own state lives in its database, not in Teams).
 
 ## Payload format
 
@@ -148,6 +187,30 @@ channel"** using `triggerBody()?['attachments']` (the first attachment's
   (e.g. a dedicated bot), which is out of scope here.
 - **Notification language:** set `teams.lang` (`"en"`/`"de"`) to pick the channel
   language; it is independent of each user's in-app UI language.
+- **@-mentioning players ("teams are set" post):** with `teams.mention_players`
+  on (the default; `GOLFG_TEAMS_MENTION_PLAYERS`), the *"It's on! Teams are set"*
+  post @-mentions the drawn players so they get a real Teams notification
+  ("X mentioned you") instead of just seeing the channel post. Only the
+  *teams-drawn* post mentions; *session started* and *match over* are unchanged.
+  Two caveats, both expected Teams behavior, not bugs:
+    - **SSO only:** a player is only mentionable if we know their Entra object id,
+      which is captured at SSO login. Dev-login users (no SSO) and any legacy
+      accounts without an OID render as a **plain name** — never a broken mention.
+    - **Channel members only:** a mention renders as a clickable name for everyone,
+      but only delivers a **notification** to players who are **members of the
+      channel** the workflow posts to. Add the players to that channel for the
+      pings to land. Set `mention_players = false` to turn pinging off entirely.
+- **Custom "session started" headline:** set `branding.play_announcement`
+  (or `GOLFG_BRANDING_PLAY_ANNOUNCEMENT`) to override the *"… wants to play …"*
+  title line with your own wording. It is a small template with a single
+  `{{.Name}}` placeholder for the creator's name, e.g.
+  `play_announcement = "{{.Name}} wants to play!"` → *"Jane Doe wants to
+  play!"*. The value is a **fixed literal** — it is not translated, so
+  `teams.lang` no longer affects this line (it still drives the "n spots left"
+  subtitle and the other cards). An empty value, or an invalid template, falls
+  back to the localized default (which also includes the activity name). The
+  matching in-app button label is `branding.play_cta`; see
+  `golfg.example.toml`.
 - **Outbound only / intranet hosting is fine:** the app just makes an outbound
   HTTPS POST to the workflow URL. Microsoft never calls back into the app, so the
   server does not need to be reachable from the internet.

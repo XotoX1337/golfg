@@ -413,6 +413,71 @@ func TestHistoryListsFinishedMatchesAndStats(t *testing.T) {
 	}
 }
 
+// readElo fetches a user's current ELO straight from the DB.
+func readElo(t *testing.T, mgr *Manager, userID string) int {
+	t.Helper()
+	var elo int
+	if err := mgr.repo.db.QueryRow(`SELECT elo FROM users WHERE id = ?`, userID).Scan(&elo); err != nil {
+		t.Fatalf("read elo for %s: %v", userID, err)
+	}
+	return elo
+}
+
+func TestFinishUpdatesEloConsistently(t *testing.T) {
+	mgr, users := newTestEnv(t)
+	s, ids := fillToDrawn(t, mgr, users)
+
+	// Everyone starts at the default, so the total is fixed.
+	for _, id := range ids {
+		if got := readElo(t, mgr, id); got != EloDefault {
+			t.Fatalf("pre-match elo for %s = %d, want %d", id, got, EloDefault)
+		}
+	}
+
+	// Record the drawn teams so we know who won/lost, then finish on team A.
+	lb, _ := mgr.Lobby(ids[0])
+	winners := map[string]bool{}
+	for _, team := range lb.Teams {
+		if team.Label == "A" {
+			for _, m := range team.Members {
+				winners[m.UserID] = true
+			}
+		}
+	}
+
+	if err := mgr.Finish(s.ID, ids[0], "A"); err != nil {
+		t.Fatalf("Finish: %v", err)
+	}
+
+	total := 0
+	for _, id := range ids {
+		got := readElo(t, mgr, id)
+		total += got
+		if winners[id] && got <= EloDefault {
+			t.Errorf("winner %s elo = %d, want > %d", id, got, EloDefault)
+		}
+		if !winners[id] && got >= EloDefault {
+			t.Errorf("loser %s elo = %d, want < %d", id, got, EloDefault)
+		}
+	}
+	if total != 4*EloDefault {
+		t.Errorf("total elo = %d, want %d (deltas must net to zero)", total, 4*EloDefault)
+	}
+}
+
+func TestCancelledRoundDoesNotChangeElo(t *testing.T) {
+	mgr, users := newTestEnv(t)
+	anton := mkUser(t, users, "Anton")
+
+	s, _ := mgr.Start(anton)
+	if err := mgr.Leave(s.ID, anton); err != nil { // cancels the empty round
+		t.Fatalf("Leave: %v", err)
+	}
+	if got := readElo(t, mgr, anton); got != EloDefault {
+		t.Errorf("cancelled round moved elo to %d, want %d", got, EloDefault)
+	}
+}
+
 func TestHistoryEmptyWhenNothingFinished(t *testing.T) {
 	mgr, _ := newTestEnv(t)
 

@@ -15,10 +15,12 @@ base_url = "http://localhost:9000"   # public URL, used for deep-links in Teams 
 tenant_id = ""
 client_id = ""
 client_secret = ""                   # prefer ENV: GOLFG_AUTH_CLIENT_SECRET
+fetch_photos = true                  # pull each user's own M365 profile photo at login (delegated Graph User.Read, user-consentable); set false to skip Graph entirely
 
 [teams]                              # leave empty = Teams posts are only logged
 webhook_url = ""                     # prefer ENV: GOLFG_TEAMS_WEBHOOK_URL
 lang = "en"                          # language for channel notifications: "en" or "de"
+mention_players = true               # @-mention drawn players in the "teams are set" post (SSO users only); set false to disable pings
 
 [session]
 expire_minutes = 30                  # open sessions auto-expire after this many minutes
@@ -27,3 +29,5 @@ cookie_secure = false                # set true in production behind HTTPS (Secu
 [branding]                           # white-label the UI (no secrets — safe to commit)
 app_name = "go LFG"                  # shown in header, page title and footer
 accent_color = "#0f766e"             # any CSS color; drives buttons, header and highlights
+play_cta = ""                        # custom "I want to play" button label (fixed literal, not translated); empty = localized default
+play_announcement = ""               # custom Teams "session started" headline; text/template with {{.Name}}, e.g. "{{.Name}} wants to play!"; empty = localized default

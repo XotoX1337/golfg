@@ -7,27 +7,7 @@
 
 {{ with .History }}
 {{ if .Stats }}
-<article>
-  <header><strong>{{ call $.T "stats_title" }}</strong></header>
-  <table>
-    <thead>
-      <tr>
-        <th scope="col">{{ call $.T "stats_player" }}</th>
-        <th scope="col">{{ call $.T "stats_played" }}</th>
-        <th scope="col">{{ call $.T "stats_wins" }}</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{ range .Stats }}
-      <tr>
-        <td><i class="ri-user-fill"></i> {{ .DisplayName }}</td>
-        <td>{{ .Played }}</td>
-        <td>{{ .Wins }}</td>
-      </tr>
-      {{ end }}
-    </tbody>
-  </table>
-</article>
+{{ template "leaderboard" (dict "T" $.T "Title" "stats_title" "Stats" .Stats) }}
 {{ end }}
 
 {{ if .Entries }}
@@ -46,7 +26,7 @@
       <ul>
         {{ range $team.Members }}
         <li>
-          <span class="avatar" aria-hidden="true">{{ Initials .DisplayName }}</span>
+          {{ template "avatar" (dict "ID" .UserID "Name" .DisplayName "HasPhoto" .HasPhoto) }}
           <span class="name">{{ .DisplayName }}</span>
         </li>
         {{ end }}

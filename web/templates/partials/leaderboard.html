@@ -1,0 +1,33 @@
+{{/*
+  Leaderboard table, shared by the history page and the home page. Expects a
+  dict of:
+    .T      — the request translator (call .T "key")
+    .Title  — message key for the card title
+    .Stats  — []session.Stat, already ranked by the server
+  Render with: {{ template "leaderboard" (dict "T" $.T "Title" "stats_title" "Stats" .Stats) }}
+*/}}
+{{ define "leaderboard" }}
+<article>
+  <header><strong>{{ call .T .Title }}</strong></header>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">{{ call .T "stats_player" }}</th>
+        <th scope="col">{{ call .T "stats_rating" }}</th>
+        <th scope="col">{{ call .T "stats_played" }}</th>
+        <th scope="col">{{ call .T "stats_wins" }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .Stats }}
+      <tr>
+        <td class="stat-player">{{ template "avatar" (dict "ID" .UserID "Name" .DisplayName "HasPhoto" .HasPhoto "Class" "avatar-sm") }} <span>{{ .DisplayName }}</span></td>
+        <td>{{ .Elo }}</td>
+        <td>{{ .Played }}</td>
+        <td>{{ .Wins }}</td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</article>
+{{ end }}

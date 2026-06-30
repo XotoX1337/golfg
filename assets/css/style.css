@@ -133,8 +133,37 @@
   width: 1.9rem;
   height: 1.9rem;
   font-size: .75rem;
+}
+
+/* Photo avatars: the <img> is layered over the initials and clipped to the
+   circle. Fixed size on .avatar means no layout shift while the image loads,
+   and onerror removal in the markup reveals the initials underneath. */
+.avatar-photo { position: relative; overflow: hidden; }
+.avatar-photo .avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.avatar-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Header avatar sits on the accent bar — keep the light-on-accent look. */
+.current-user .avatar {
   background: rgba(255, 255, 255, .2);
   color: #fff;
+}
+
+/* Leaderboard player cell: avatar and name on one line. */
+.stat-player {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
 }
 
 /* ---- Lobby: shared ------------------------------------------------------ */
@@ -346,10 +375,6 @@ footer.container {
     animation-duration: .18s;
   }
 }
-
-/* Fade the fragment slightly while a request is in flight (e.g. on action
-   clicks); polling refreshes are quick enough to stay invisible. */
-#session.htmx-request { opacity: .65; transition: opacity .15s ease; }
 
 /* ---- Mobile-first refinements ------------------------------------------ */
 /* Full-width, touch-friendly action buttons inside lobby cards. */
