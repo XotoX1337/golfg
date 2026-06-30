@@ -103,6 +103,44 @@ If nothing appears, check the app log: a successful send logs
 or `teams: unexpected status`. Posts are best-effort and asynchronous, so a
 broken webhook never blocks or crashes the app.
 
+## 5. Auto-delete old messages (retention policy)
+
+go LFG's posts are throwaway by design — once a session is over, its cards have
+served their purpose. To keep the **Kickern** channel from growing forever you can
+have Microsoft delete messages automatically after a chosen age. This is a
+**Microsoft 365 / Purview** feature, configured by an admin outside go LFG; the
+app itself has no say in it.
+
+> **Permissions:** you need a role that can manage retention in the
+> [Microsoft Purview portal](https://purview.microsoft.com) (e.g. *Compliance
+> Administrator* or *Global Administrator*). Retention policies can take **up to
+> ~7 days** to take effect, and deletion is **permanent** — there is no per-message
+> opt-out once the policy applies, so scope it to just the right channel.
+
+1. Go to the [Microsoft Purview portal](https://purview.microsoft.com) →
+   **Data Lifecycle Management** → **Policies → Retention policies** →
+   **New retention policy**.
+2. Give it a name, e.g. *"Kickern channel cleanup"*.
+3. For the retention setting, choose **Retain items for a specific period** (or
+   skip retention entirely) and then **delete items automatically** after your
+   chosen age — e.g. **30 days** — counted from when each message was created.
+4. For the **scope (locations)**, this matters:
+   - Standard channel messages live in the **Teams channel messages** location.
+     Selecting it applies to the team, and you narrow it to the specific team
+     (the one holding **Kickern**). Note that a *standard* channel's messages
+     can't always be scoped to a single channel — the policy applies at the team
+     level — so put **Kickern** in a team where team-wide message retention is
+     acceptable, or use a **private/shared channel** (which has its own
+     location: **Teams private/shared channel messages**) if you need
+     channel-level granularity.
+5. Review and **submit**. Existing messages older than the threshold start being
+   removed on the next cleanup cycle; new ones age out continuously thereafter.
+
+This is purely a housekeeping convenience and is **independent of go LFG** —
+the app keeps posting; Microsoft just prunes the channel on the schedule you set.
+Deleting an old card in the channel never affects sessions or data in go LFG (the
+app's own state lives in its database, not in Teams).
+
 ## Payload format
 
 go LFG POSTs JSON the Power-Automate "Teams webhook" trigger understands: a
