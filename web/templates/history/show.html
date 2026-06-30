@@ -26,7 +26,7 @@
       <ul>
         {{ range $team.Members }}
         <li>
-          <span class="avatar" aria-hidden="true">{{ Initials .DisplayName }}</span>
+          {{ template "avatar" (dict "ID" .UserID "Name" .DisplayName "HasPhoto" .HasPhoto) }}
           <span class="name">{{ .DisplayName }}</span>
         </li>
         {{ end }}

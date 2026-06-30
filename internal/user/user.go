@@ -19,6 +19,7 @@ type User struct {
 	EntraOID    string
 	DisplayName string
 	Email       string
+	HasPhoto    bool // a cached M365 profile photo exists (served via /avatar/:id)
 }
 
 // Repository provides access to the users table.
@@ -31,7 +32,11 @@ func NewRepository(st *store.Store) *Repository {
 	return &Repository{db: st.DB}
 }
 
-const selectColumns = `SELECT id, COALESCE(entra_oid, ''), display_name, COALESCE(email, '') FROM users`
+// selectColumns deliberately probes photo presence with EXISTS rather than
+// joining user_photos — every user scan stays cheap and never reads the image
+// bytes (those are streamed on demand by the /avatar route).
+const selectColumns = `SELECT id, COALESCE(entra_oid, ''), display_name, COALESCE(email, ''),
+	EXISTS(SELECT 1 FROM user_photos WHERE user_photos.user_id = users.id) FROM users`
 
 // GetByID returns the user with the given internal id, or nil if none exists.
 func (r *Repository) GetByID(id string) (*User, error) {
@@ -89,7 +94,7 @@ func (r *Repository) UpsertDev(displayName, email string) (*User, error) {
 // scanOne runs a single-row query and returns nil (no error) when there is no row.
 func (r *Repository) scanOne(query string, args ...any) (*User, error) {
 	var u User
-	err := r.db.QueryRow(query, args...).Scan(&u.ID, &u.EntraOID, &u.DisplayName, &u.Email)
+	err := r.db.QueryRow(query, args...).Scan(&u.ID, &u.EntraOID, &u.DisplayName, &u.Email, &u.HasPhoto)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

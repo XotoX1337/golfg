@@ -15,6 +15,7 @@ import (
 	"github.com/XotoX1337/golfg/internal/session"
 	"github.com/XotoX1337/golfg/internal/store"
 	"github.com/XotoX1337/golfg/internal/teams"
+	"github.com/XotoX1337/golfg/internal/user"
 	"github.com/XotoX1337/golfg/web"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
@@ -30,6 +31,7 @@ type Server struct {
 	logger   *zap.Logger
 	auth     *auth.Manager
 	sessions *session.Manager
+	users    *user.Repository
 	i18n     *i18n.Bundle
 
 	reaperStop chan struct{} // closed on Shutdown to stop the expiry reaper
@@ -89,7 +91,7 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 	notifier := teams.New(cfg.Teams.WebhookURL, cfg.App.BaseURL, cfg.PlayAnnouncement(), cfg.Teams.MentionPlayers, bundle.Localizer(cfg.Teams.Lang), logger)
 	sessionMgr := session.New(st, logger, cfg.Session.ExpireMinutes, session.WithNotifier(notifier))
 
-	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr, sessions: sessionMgr, i18n: bundle}
+	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr, sessions: sessionMgr, users: user.NewRepository(st), i18n: bundle}
 	s.routes(staticFS)
 	if cfg.Session.ExpireMinutes > 0 {
 		s.startReaper()
@@ -199,6 +201,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.app.Get("/session/finish", s.auth.RequireAuth, s.showFinishModal)
 	s.app.Post("/session/finish", s.auth.RequireAuth, s.finishSession)
 	s.app.Get("/history", s.auth.RequireAuth, s.showHistory)
+	s.app.Get("/avatar/:userID", s.auth.RequireAuth, s.showAvatar)
 
 	// Serve embedded static assets as a catch-all (must be registered last).
 	s.app.Use("/", filesystem.New(filesystem.Config{

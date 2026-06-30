@@ -15,6 +15,7 @@ base_url = "http://localhost:9000"   # public URL, used for deep-links in Teams 
 tenant_id = ""
 client_id = ""
 client_secret = ""                   # prefer ENV: GOLFG_AUTH_CLIENT_SECRET
+fetch_photos = true                  # pull each user's own M365 profile photo at login (delegated Graph User.Read, user-consentable); set false to skip Graph entirely
 
 [teams]                              # leave empty = Teams posts are only logged
 webhook_url = ""                     # prefer ENV: GOLFG_TEAMS_WEBHOOK_URL

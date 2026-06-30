@@ -21,7 +21,7 @@
     <tbody>
       {{ range .Stats }}
       <tr>
-        <td><i class="ri-user-fill"></i> {{ .DisplayName }}</td>
+        <td class="stat-player">{{ template "avatar" (dict "ID" .UserID "Name" .DisplayName "HasPhoto" .HasPhoto "Class" "avatar-sm") }} <span>{{ .DisplayName }}</span></td>
         <td>{{ .Elo }}</td>
         <td>{{ .Played }}</td>
         <td>{{ .Wins }}</td>

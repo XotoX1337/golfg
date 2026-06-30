@@ -66,6 +66,7 @@ type Participant struct {
 	EntraOID    string // Entra object id from SSO; "" for dev-login users (no SSO)
 	Team        string // "" | "A" | "B" | ...
 	Elo         int    // current rating, used to seed the team-vs-team ELO update
+	HasPhoto    bool   // a cached M365 photo exists (rendered as an avatar via /avatar/:id)
 }
 
 // Team is a drawn team with its members, for display.
@@ -148,10 +149,12 @@ func (e HistoryEntry) Winner() string {
 
 // Stat is one player's tally across finished matches (a leaderboard row).
 type Stat struct {
+	UserID      string // drives the /avatar/:id URL when HasPhoto is set
 	DisplayName string
 	Elo         int
 	Played      int
 	Wins        int
+	HasPhoto    bool // a cached M365 photo exists (rendered as an avatar)
 }
 
 // History is the view model for the history/stats page: recent finished matches,

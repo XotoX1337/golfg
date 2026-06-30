@@ -92,10 +92,12 @@ func (r *Repository) TopPlayers(limit int) ([]Stat, error) {
 // query — the leaderboard is read-rarely and the data set is tiny.
 func (r *Repository) leaderboard(limit int) ([]Stat, error) {
 	rows, err := r.db.Query(`
-		SELECT u.display_name,
+		SELECT u.id,
+		       u.display_name,
 		       u.elo,
 		       COUNT(*) AS played,
-		       COALESCE(SUM(CASE WHEN p.team = s.winner_team THEN 1 ELSE 0 END), 0) AS wins
+		       COALESCE(SUM(CASE WHEN p.team = s.winner_team THEN 1 ELSE 0 END), 0) AS wins,
+		       EXISTS(SELECT 1 FROM user_photos up WHERE up.user_id = u.id) AS has_photo
 		FROM participations p
 		JOIN sessions s ON s.id = p.session_id
 		JOIN users u ON u.id = p.user_id
@@ -111,7 +113,7 @@ func (r *Repository) leaderboard(limit int) ([]Stat, error) {
 	var out []Stat
 	for rows.Next() {
 		var st Stat
-		if err := rows.Scan(&st.DisplayName, &st.Elo, &st.Played, &st.Wins); err != nil {
+		if err := rows.Scan(&st.UserID, &st.DisplayName, &st.Elo, &st.Played, &st.Wins, &st.HasPhoto); err != nil {
 			return nil, err
 		}
 		out = append(out, st)
@@ -211,7 +213,8 @@ func (r *Repository) CountParticipants(sessionID string) (int, error) {
 // ordered by join time.
 func (r *Repository) Participants(sessionID string) ([]Participant, error) {
 	rows, err := r.db.Query(`
-		SELECT p.user_id, COALESCE(u.display_name, ''), COALESCE(u.email, ''), COALESCE(u.entra_oid, ''), COALESCE(p.team, ''), u.elo
+		SELECT p.user_id, COALESCE(u.display_name, ''), COALESCE(u.email, ''), COALESCE(u.entra_oid, ''), COALESCE(p.team, ''), u.elo,
+		       EXISTS(SELECT 1 FROM user_photos up WHERE up.user_id = u.id)
 		FROM participations p
 		JOIN users u ON u.id = p.user_id
 		WHERE p.session_id = ?
@@ -224,7 +227,7 @@ func (r *Repository) Participants(sessionID string) ([]Participant, error) {
 	var out []Participant
 	for rows.Next() {
 		var p Participant
-		if err := rows.Scan(&p.UserID, &p.DisplayName, &p.Email, &p.EntraOID, &p.Team, &p.Elo); err != nil {
+		if err := rows.Scan(&p.UserID, &p.DisplayName, &p.Email, &p.EntraOID, &p.Team, &p.Elo, &p.HasPhoto); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

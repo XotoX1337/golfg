@@ -21,12 +21,18 @@ func (m *Manager) initOIDC(ctx context.Context) error {
 		return fmt.Errorf("discover provider: %w", err)
 	}
 	m.verifier = provider.Verifier(&oidc.Config{ClientID: m.cfg.Auth.ClientID})
+	scopes := []string{oidc.ScopeOpenID, "profile", "email"}
+	if m.cfg.Auth.FetchPhotos {
+		// Delegated Graph permission needed to read the user's own /me/photo.
+		// user-consentable (no admin consent); only requested when photo fetch is on.
+		scopes = append(scopes, "User.Read")
+	}
 	m.oauth = &oauth2.Config{
 		ClientID:     m.cfg.Auth.ClientID,
 		ClientSecret: m.cfg.Auth.ClientSecret,
 		RedirectURL:  m.redirectURL(),
 		Endpoint:     provider.Endpoint(),
-		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		Scopes:       scopes,
 	}
 	return nil
 }
@@ -138,6 +144,12 @@ func (m *Manager) handleCallback(c *fiber.Ctx) error {
 	}
 	if err := m.login(c, u); err != nil {
 		return err
+	}
+	// Best-effort: pull the user's M365 photo with the Graph access token and
+	// cache it. Never blocks or fails the login (no photo / timeout / missing
+	// permission are all just logged); the user lands in the lobby regardless.
+	if m.cfg.Auth.FetchPhotos {
+		m.fetchAndStorePhoto(ctx, u, token.AccessToken)
 	}
 	m.logger.Info("user logged in via SSO", zap.String("user", u.DisplayName))
 	return c.Redirect("/", fiber.StatusFound)

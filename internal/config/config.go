@@ -56,6 +56,11 @@ type AuthConfig struct {
 	TenantID     string `mapstructure:"tenant_id"`
 	ClientID     string `mapstructure:"client_id"`
 	ClientSecret string `mapstructure:"client_secret"`
+	// FetchPhotos, when true (default), requests the delegated Graph permission
+	// User.Read at login and best-effort caches the user's own M365 profile photo
+	// for display. Set false to keep logins to the bare OIDC scopes and never call
+	// Graph. No effect in dev mode (no Graph token). Default true.
+	FetchPhotos bool `mapstructure:"fetch_photos"`
 }
 
 // TeamsConfig holds the Power-Automate webhook. Empty = posts are only logged.
@@ -160,6 +165,7 @@ var envBindings = []struct {
 	{"auth.tenant_id", "GOLFG_AUTH_TENANT_ID", ""},
 	{"auth.client_id", "GOLFG_AUTH_CLIENT_ID", ""},
 	{"auth.client_secret", "GOLFG_AUTH_CLIENT_SECRET", ""},
+	{"auth.fetch_photos", "GOLFG_AUTH_FETCH_PHOTOS", true},
 	{"teams.webhook_url", "GOLFG_TEAMS_WEBHOOK_URL", ""},
 	{"teams.lang", "GOLFG_TEAMS_LANG", "en"},
 	{"teams.mention_players", "GOLFG_TEAMS_MENTION_PLAYERS", true},
