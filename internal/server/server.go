@@ -86,7 +86,7 @@ func New(cfg *config.Config, st *store.Store, logger *zap.Logger) (*Server, erro
 	// Teams notifier: posts session events to the configured webhook, or logs
 	// them when none is set (graceful degradation). The channel has no
 	// per-request locale, so its language is fixed by config.
-	notifier := teams.New(cfg.Teams.WebhookURL, cfg.App.BaseURL, cfg.PlayAnnouncement(), bundle.Localizer(cfg.Teams.Lang), logger)
+	notifier := teams.New(cfg.Teams.WebhookURL, cfg.App.BaseURL, cfg.PlayAnnouncement(), cfg.Teams.MentionPlayers, bundle.Localizer(cfg.Teams.Lang), logger)
 	sessionMgr := session.New(st, logger, cfg.Session.ExpireMinutes, session.WithNotifier(notifier))
 
 	s := &Server{app: app, cfg: cfg, store: st, logger: logger, auth: authMgr, sessions: sessionMgr, i18n: bundle}

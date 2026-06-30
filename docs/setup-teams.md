@@ -71,6 +71,7 @@ base_url = "https://kicker.intranet"   # used for the deep-link button in cards
 [teams]
 webhook_url = ""                        # leave empty here; inject via ENV
 lang = "en"                             # channel notification language: "en" or "de"
+mention_players = true                  # @-mention drawn players in the "teams are set" post (set false to disable)
 ```
 
 Then provide the secret URL via environment variable when starting the app:
@@ -148,6 +149,19 @@ channel"** using `triggerBody()?['attachments']` (the first attachment's
   (e.g. a dedicated bot), which is out of scope here.
 - **Notification language:** set `teams.lang` (`"en"`/`"de"`) to pick the channel
   language; it is independent of each user's in-app UI language.
+- **@-mentioning players ("teams are set" post):** with `teams.mention_players`
+  on (the default; `GOLFG_TEAMS_MENTION_PLAYERS`), the *"It's on! Teams are set"*
+  post @-mentions the drawn players so they get a real Teams notification
+  ("X mentioned you") instead of just seeing the channel post. Only the
+  *teams-drawn* post mentions; *session started* and *match over* are unchanged.
+  Two caveats, both expected Teams behavior, not bugs:
+    - **SSO only:** a player is only mentionable if we know their Entra object id,
+      which is captured at SSO login. Dev-login users (no SSO) and any legacy
+      accounts without an OID render as a **plain name** — never a broken mention.
+    - **Channel members only:** a mention renders as a clickable name for everyone,
+      but only delivers a **notification** to players who are **members of the
+      channel** the workflow posts to. Add the players to that channel for the
+      pings to land. Set `mention_players = false` to turn pinging off entirely.
 - **Custom "session started" headline:** set `branding.play_announcement`
   (or `GOLFG_BRANDING_PLAY_ANNOUNCEMENT`) to override the *"… wants to play …"*
   title line with your own wording. It is a small template with a single

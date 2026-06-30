@@ -35,12 +35,13 @@ const postTimeout = 10 * time.Second
 // Client posts Adaptive Cards to a Power-Automate workflow webhook. The zero
 // value is not usable; build one with New.
 type Client struct {
-	webhookURL  string
-	baseURL     string // app base URL for deep-links, without trailing slash
-	loc         *i18n.Localizer
-	startedTmpl *template.Template // optional custom "session started" headline
-	http        *http.Client
-	logger      *zap.Logger
+	webhookURL     string
+	baseURL        string // app base URL for deep-links, without trailing slash
+	loc            *i18n.Localizer
+	startedTmpl    *template.Template // optional custom "session started" headline
+	mentionPlayers bool               // @-mention drawn players in the "teams are set" post
+	http           *http.Client
+	logger         *zap.Logger
 }
 
 // New builds a Teams client. An empty webhookURL puts the client in log-only
@@ -49,7 +50,9 @@ type Client struct {
 // per-request locale). playAnnouncement, when non-empty, is a text/template with
 // a single {{.Name}} placeholder that overrides the localized "session started"
 // headline; an invalid template is logged and ignored (the default is used).
-func New(webhookURL, baseURL, playAnnouncement string, loc *i18n.Localizer, logger *zap.Logger) *Client {
+// mentionPlayers enables @-mentions of the drawn players in the "teams are set"
+// post (members with an Entra object id only — see TeamsDrawn).
+func New(webhookURL, baseURL, playAnnouncement string, mentionPlayers bool, loc *i18n.Localizer, logger *zap.Logger) *Client {
 	var startedTmpl *template.Template
 	if s := strings.TrimSpace(playAnnouncement); s != "" {
 		t, err := template.New("play_announcement").Parse(s)
@@ -60,12 +63,13 @@ func New(webhookURL, baseURL, playAnnouncement string, loc *i18n.Localizer, logg
 		}
 	}
 	return &Client{
-		webhookURL:  strings.TrimSpace(webhookURL),
-		baseURL:     strings.TrimRight(strings.TrimSpace(baseURL), "/"),
-		loc:         loc,
-		startedTmpl: startedTmpl,
-		http:        &http.Client{Timeout: postTimeout},
-		logger:      logger,
+		webhookURL:     strings.TrimSpace(webhookURL),
+		baseURL:        strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+		loc:            loc,
+		startedTmpl:    startedTmpl,
+		mentionPlayers: mentionPlayers,
+		http:           &http.Client{Timeout: postTimeout},
+		logger:         logger,
 	}
 }
 
@@ -89,7 +93,7 @@ func (c *Client) SessionStarted(e session.SessionStartedEvent) {
 	msg := c.card([]cardElement{
 		textBlock(title, "Large", "Bolder"),
 		textBlock(sub, "", ""),
-	}, c.t("teams_notify_join_action"))
+	}, c.t("teams_notify_join_action"), nil)
 	c.post("session started", title+" — "+sub, msg)
 }
 
@@ -113,16 +117,27 @@ func (c *Client) startedTitle(name, activity string) string {
 	return buf.String()
 }
 
-// TeamsDrawn posts the final line-up once the session is full.
+// TeamsDrawn posts the final line-up once the session is full. When
+// mentionPlayers is on, each drawn member with an Entra object id is rendered as
+// an @-mention so they get a real Teams notification; members without one (dev
+// login) fall back to a plain name. The card carries the matching msteams
+// mention entities (see mentionTeamLine). The log summary always uses plain
+// names so the OID tokens never leak into the log.
 func (c *Client) TeamsDrawn(e session.TeamsDrawnEvent) {
 	body := []cardElement{textBlock(c.t("teams_notify_drawn_title"), "Large", "Bolder")}
 	var summary []string
+	var mentions []mentionEntity
 	for _, t := range e.Teams {
-		line := c.teamLine(t)
-		body = append(body, textBlock(line, "", "Bolder"))
-		summary = append(summary, line)
+		summary = append(summary, c.teamLine(t))
+		if c.mentionPlayers {
+			line, ents := c.mentionTeamLine(t)
+			body = append(body, textBlock(line, "", "Bolder"))
+			mentions = append(mentions, ents...)
+		} else {
+			body = append(body, textBlock(c.teamLine(t), "", "Bolder"))
+		}
 	}
-	msg := c.card(body, c.t("teams_notify_open_action"))
+	msg := c.card(body, c.t("teams_notify_open_action"), mentions)
 	c.post("teams drawn", strings.Join(summary, " — "), msg)
 }
 
@@ -139,7 +154,7 @@ func (c *Client) MatchFinished(r session.MatchResult) {
 	for _, t := range r.Teams {
 		body = append(body, textBlock(c.teamLine(t), "", ""))
 	}
-	msg := c.card(body, c.t("teams_notify_open_action"))
+	msg := c.card(body, c.t("teams_notify_open_action"), nil)
 	c.post("match finished", title, msg)
 }
 
@@ -151,6 +166,33 @@ func (c *Client) teamLine(t session.Team) string {
 		names = append(names, displayName(m))
 	}
 	return c.t("teams_notify_team_line", "Name", t.Name(), "Names", strings.Join(names, ", "))
+}
+
+// mentionTeamLine renders the same "Name: members" line as teamLine, but replaces
+// each member that has an Entra object id with an "<at>Display Name</at>" mention
+// token and returns the matching mention entities to attach to the card. Members
+// without an OID (dev login, legacy data) stay plain names — never a broken or
+// empty token. Token text and entity text are kept byte-identical (Teams only
+// renders the mention when they match exactly).
+func (c *Client) mentionTeamLine(t session.Team) (string, []mentionEntity) {
+	names := make([]string, 0, len(t.Members))
+	var ents []mentionEntity
+	for _, m := range t.Members {
+		name := displayName(m)
+		if m.EntraOID == "" {
+			names = append(names, name)
+			continue
+		}
+		token := "<at>" + name + "</at>"
+		names = append(names, token)
+		ents = append(ents, mentionEntity{
+			Type:      "mention",
+			Text:      token,
+			Mentioned: mentioned{ID: m.EntraOID, Name: name},
+		})
+	}
+	line := c.t("teams_notify_team_line", "Name", t.Name(), "Names", strings.Join(names, ", "))
+	return line, ents
 }
 
 // post sends msg to the webhook in the background. With no webhook configured it
@@ -201,8 +243,10 @@ func (c *Client) post(event, summary string, msg adaptiveMessage) {
 }
 
 // card wraps the given body elements in the message envelope the Power-Automate
-// trigger expects, optionally adding a single deep-link button to the app.
-func (c *Client) card(body []cardElement, actionTitle string) adaptiveMessage {
+// trigger expects, optionally adding a single deep-link button to the app and a
+// set of @-mention entities (attached to the card's msteams property, which is
+// where Teams resolves the <at>…</at> tokens in the body).
+func (c *Client) card(body []cardElement, actionTitle string, mentions []mentionEntity) adaptiveMessage {
 	ac := adaptiveCard{
 		Schema:  "http://adaptivecards.io/schemas/adaptive-card.json",
 		Type:    "AdaptiveCard",
@@ -215,6 +259,9 @@ func (c *Client) card(body []cardElement, actionTitle string) adaptiveMessage {
 			Title: actionTitle,
 			URL:   c.baseURL + "/",
 		}}
+	}
+	if len(mentions) > 0 {
+		ac.Msteams = &msteamsProps{Entities: mentions}
 	}
 	return adaptiveMessage{
 		Type: "message",
@@ -262,6 +309,31 @@ type adaptiveCard struct {
 	Version string        `json:"version"`
 	Body    []cardElement `json:"body"`
 	Actions []cardAction  `json:"actions,omitempty"`
+	// Msteams carries Teams-specific extensions (here: @-mention entities). It
+	// belongs on the card content, not the message envelope. Omitted when there
+	// are no mentions.
+	Msteams *msteamsProps `json:"msteams,omitempty"`
+}
+
+// msteamsProps is the card's "msteams" extension object. entities[] declares the
+// @-mentions whose <at>…</at> tokens appear in the body text.
+type msteamsProps struct {
+	Entities []mentionEntity `json:"entities"`
+}
+
+// mentionEntity binds an <at>Name</at> token in the body to a real user. Text
+// must match the body token character-for-character or Teams won't render it.
+type mentionEntity struct {
+	Type      string    `json:"type"` // always "mention"
+	Text      string    `json:"text"` // the <at>…</at> token, byte-identical to the body
+	Mentioned mentioned `json:"mentioned"`
+}
+
+// mentioned identifies the user to ping. ID is the Entra object id (the Teams
+// webhook also accepts a UPN/email); Name is the display name.
+type mentioned struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type cardElement struct {

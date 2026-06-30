@@ -65,6 +65,11 @@ type TeamsConfig struct {
 	// notifications. The Teams channel has no per-request locale, so the
 	// language is fixed by config. Empty falls back to the i18n default.
 	Lang string `mapstructure:"lang"`
+	// MentionPlayers, when true, @-mentions the drawn players in the "teams are
+	// set" post so they get a real Teams notification. Only members with an
+	// Entra object id (SSO login) can be mentioned; dev-login users render as a
+	// plain name. Default true. Disable with mention_players = false.
+	MentionPlayers bool `mapstructure:"mention_players"`
 }
 
 // BrandingConfig holds white-label UI settings so the public repo carries no
@@ -157,6 +162,7 @@ var envBindings = []struct {
 	{"auth.client_secret", "GOLFG_AUTH_CLIENT_SECRET", ""},
 	{"teams.webhook_url", "GOLFG_TEAMS_WEBHOOK_URL", ""},
 	{"teams.lang", "GOLFG_TEAMS_LANG", "en"},
+	{"teams.mention_players", "GOLFG_TEAMS_MENTION_PLAYERS", true},
 	{"session.expire_minutes", "GOLFG_SESSION_EXPIRE_MINUTES", 30},
 	{"session.cookie_secure", "GOLFG_SESSION_COOKIE_SECURE", false},
 }

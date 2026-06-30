@@ -19,6 +19,7 @@ client_secret = ""                   # prefer ENV: GOLFG_AUTH_CLIENT_SECRET
 [teams]                              # leave empty = Teams posts are only logged
 webhook_url = ""                     # prefer ENV: GOLFG_TEAMS_WEBHOOK_URL
 lang = "en"                          # language for channel notifications: "en" or "de"
+mention_players = true               # @-mention drawn players in the "teams are set" post (SSO users only); set false to disable pings
 
 [session]
 expire_minutes = 30                  # open sessions auto-expire after this many minutes

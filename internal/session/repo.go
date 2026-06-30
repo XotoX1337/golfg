@@ -211,7 +211,7 @@ func (r *Repository) CountParticipants(sessionID string) (int, error) {
 // ordered by join time.
 func (r *Repository) Participants(sessionID string) ([]Participant, error) {
 	rows, err := r.db.Query(`
-		SELECT p.user_id, COALESCE(u.display_name, ''), COALESCE(u.email, ''), COALESCE(p.team, ''), u.elo
+		SELECT p.user_id, COALESCE(u.display_name, ''), COALESCE(u.email, ''), COALESCE(u.entra_oid, ''), COALESCE(p.team, ''), u.elo
 		FROM participations p
 		JOIN users u ON u.id = p.user_id
 		WHERE p.session_id = ?
@@ -224,7 +224,7 @@ func (r *Repository) Participants(sessionID string) ([]Participant, error) {
 	var out []Participant
 	for rows.Next() {
 		var p Participant
-		if err := rows.Scan(&p.UserID, &p.DisplayName, &p.Email, &p.Team, &p.Elo); err != nil {
+		if err := rows.Scan(&p.UserID, &p.DisplayName, &p.Email, &p.EntraOID, &p.Team, &p.Elo); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

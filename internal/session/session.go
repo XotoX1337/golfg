@@ -63,6 +63,7 @@ type Participant struct {
 	UserID      string
 	DisplayName string
 	Email       string
+	EntraOID    string // Entra object id from SSO; "" for dev-login users (no SSO)
 	Team        string // "" | "A" | "B" | ...
 	Elo         int    // current rating, used to seed the team-vs-team ELO update
 }

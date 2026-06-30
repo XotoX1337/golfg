@@ -50,7 +50,7 @@ func decode(t *testing.T, body []byte) adaptiveMessage {
 
 func TestSessionStartedPostsCard(t *testing.T) {
 	srv, bodies := captureServer(t)
-	c := New(srv.URL, "https://kicker.intranet/", "", testLocalizer(t), zap.NewNop())
+	c := New(srv.URL, "https://kicker.intranet/", "", true, testLocalizer(t), zap.NewNop())
 
 	c.SessionStarted(session.SessionStartedEvent{
 		Session:   &session.Session{ID: "s1"},
@@ -84,7 +84,7 @@ func TestSessionStartedPostsCard(t *testing.T) {
 
 func TestTeamsDrawnListsBothTeams(t *testing.T) {
 	srv, bodies := captureServer(t)
-	c := New(srv.URL, "https://kicker.intranet", "", testLocalizer(t), zap.NewNop())
+	c := New(srv.URL, "https://kicker.intranet", "", false, testLocalizer(t), zap.NewNop())
 
 	c.TeamsDrawn(session.TeamsDrawnEvent{
 		Session:  &session.Session{ID: "s1"},
@@ -112,7 +112,7 @@ func TestTeamsDrawnListsBothTeams(t *testing.T) {
 
 func TestMatchFinishedPostsWinner(t *testing.T) {
 	srv, bodies := captureServer(t)
-	c := New(srv.URL, "https://kicker.intranet", "", testLocalizer(t), zap.NewNop())
+	c := New(srv.URL, "https://kicker.intranet", "", true, testLocalizer(t), zap.NewNop())
 
 	c.MatchFinished(session.MatchResult{
 		Session:    &session.Session{ID: "s1"},
@@ -139,6 +139,89 @@ func TestMatchFinishedPostsWinner(t *testing.T) {
 	}
 }
 
+// With mentions enabled, members carrying an Entra object id are rendered as
+// <at>…</at> tokens and the card collects matching msteams mention entities;
+// members without an OID stay plain names (no token, no entity). The token text
+// and the entity text must be byte-identical or Teams won't render the mention.
+func TestTeamsDrawnMentionsPlayersWithOID(t *testing.T) {
+	srv, bodies := captureServer(t)
+	c := New(srv.URL, "https://kicker.intranet", "", true, testLocalizer(t), zap.NewNop())
+
+	c.TeamsDrawn(session.TeamsDrawnEvent{
+		Session:  &session.Session{ID: "s1"},
+		Activity: &activity.Activity{Name: "Tischfußball"},
+		Teams: []session.Team{
+			{Label: "A", Members: []session.Participant{
+				{DisplayName: "Anton", EntraOID: "oid-anton"},
+				{DisplayName: "Berta"}, // dev login, no OID → plain name
+			}},
+			{Label: "B", Members: []session.Participant{
+				{DisplayName: "Carl", EntraOID: "oid-carl"},
+			}},
+		},
+	})
+
+	select {
+	case body := <-bodies:
+		card := decode(t, body).Attachments[0].Content
+		if card.Msteams == nil {
+			t.Fatal("expected msteams mention entities on the card")
+		}
+		if len(card.Msteams.Entities) != 2 {
+			t.Fatalf("expected 2 mentions (Anton, Carl), got %d: %+v", len(card.Msteams.Entities), card.Msteams.Entities)
+		}
+		bodyText := card.Body[1].Text + " " + card.Body[2].Text
+		for _, e := range card.Msteams.Entities {
+			if e.Type != "mention" {
+				t.Errorf("entity type: got %q", e.Type)
+			}
+			if e.Mentioned.ID == "" {
+				t.Errorf("entity %q has empty mentioned.id", e.Text)
+			}
+			// the entity text must appear verbatim in the body
+			if !strings.Contains(bodyText, e.Text) {
+				t.Errorf("entity text %q has no matching <at> token in body %q", e.Text, bodyText)
+			}
+		}
+		if strings.Contains(bodyText, "<at>Berta</at>") {
+			t.Errorf("member without OID should stay a plain name, got token in %q", bodyText)
+		}
+		if !strings.Contains(bodyText, "Berta") {
+			t.Errorf("member without OID should still appear as a plain name: %q", bodyText)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no webhook request received")
+	}
+}
+
+// With mentions disabled the "teams are set" card must carry no msteams entities
+// and no <at> tokens — exactly the pre-feature behavior.
+func TestTeamsDrawnNoMentionsWhenDisabled(t *testing.T) {
+	srv, bodies := captureServer(t)
+	c := New(srv.URL, "https://kicker.intranet", "", false, testLocalizer(t), zap.NewNop())
+
+	c.TeamsDrawn(session.TeamsDrawnEvent{
+		Session:  &session.Session{ID: "s1"},
+		Activity: &activity.Activity{Name: "Tischfußball"},
+		Teams: []session.Team{
+			{Label: "A", Members: []session.Participant{{DisplayName: "Anton", EntraOID: "oid-anton"}}},
+		},
+	})
+
+	select {
+	case body := <-bodies:
+		card := decode(t, body).Attachments[0].Content
+		if card.Msteams != nil {
+			t.Errorf("mentions disabled: expected no msteams entities, got %+v", card.Msteams)
+		}
+		if strings.Contains(card.Body[1].Text, "<at>") {
+			t.Errorf("mentions disabled: expected no <at> token, got %q", card.Body[1].Text)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no webhook request received")
+	}
+}
+
 // With no webhook configured the client must not call out (log-only mode) and
 // must never block or panic.
 func TestNoWebhookIsLogOnly(t *testing.T) {
@@ -148,7 +231,7 @@ func TestNoWebhookIsLogOnly(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := New("", "https://kicker.intranet", "", testLocalizer(t), zap.NewNop())
+	c := New("", "https://kicker.intranet", "", true, testLocalizer(t), zap.NewNop())
 	c.SessionStarted(session.SessionStartedEvent{
 		Session:  &session.Session{ID: "s1"},
 		Activity: &activity.Activity{Name: "Tischfußball"},
@@ -164,7 +247,7 @@ func TestNoWebhookIsLogOnly(t *testing.T) {
 // the creator's {{.Name}}; the subtitle ("n spots left") stays untouched.
 func TestPlayAnnouncementOverridesTitle(t *testing.T) {
 	srv, bodies := captureServer(t)
-	c := New(srv.URL, "https://kicker.intranet", "{{.Name}} will kickern!", testLocalizer(t), zap.NewNop())
+	c := New(srv.URL, "https://kicker.intranet", "{{.Name}} will kickern!", true, testLocalizer(t), zap.NewNop())
 
 	c.SessionStarted(session.SessionStartedEvent{
 		Session:   &session.Session{ID: "s1"},
@@ -191,7 +274,7 @@ func TestPlayAnnouncementOverridesTitle(t *testing.T) {
 // default headline (which carries the activity name).
 func TestPlayAnnouncementInvalidFallsBack(t *testing.T) {
 	srv, bodies := captureServer(t)
-	c := New(srv.URL, "https://kicker.intranet", "{{.Name", testLocalizer(t), zap.NewNop())
+	c := New(srv.URL, "https://kicker.intranet", "{{.Name", true, testLocalizer(t), zap.NewNop())
 
 	c.SessionStarted(session.SessionStartedEvent{
 		Session:   &session.Session{ID: "s1"},
